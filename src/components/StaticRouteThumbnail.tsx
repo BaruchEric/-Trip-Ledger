@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, MapPin, Route as RouteIcon } from 'lucide-react';
+import { useI18n } from '../lib/i18n';
 import { buildRouteStaticMapUrl } from '../lib/staticMapUrlBuilder';
 import type { PlaceSelection } from '../types/mileage';
 
@@ -22,6 +23,7 @@ export function StaticRouteThumbnail({
   isRoundTrip,
   darkMode = false,
 }: StaticRouteThumbnailProps) {
+  const { t } = useI18n();
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
 
@@ -46,12 +48,15 @@ export function StaticRouteThumbnail({
       <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-2 text-xs">
         <span className="inline-flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-100">
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-          Route Confirmation Preview
+          {t('staticMap.title')}
         </span>
-        <span className="font-mono tabular-nums text-slate-600 dark:text-slate-300 whitespace-nowrap">
-          {oneWayMiles > 0 ? `${oneWayMiles.toFixed(1)} mi` : 'Pending'}
+        <span
+          className="font-mono tabular-nums text-slate-600 dark:text-slate-300 whitespace-nowrap"
+          dir="ltr"
+        >
+          {oneWayMiles > 0 ? `${oneWayMiles.toFixed(1)} ${t('common.mi')}` : t('staticMap.pending')}
           {isRoundTrip ? ' × 2' : ''}
-          {durationMinutes > 0 ? ` · ${durationMinutes} min` : ''}
+          {durationMinutes > 0 ? ` · ${durationMinutes} ${t('common.min')}` : ''}
         </span>
       </div>
 
@@ -79,9 +84,7 @@ export function StaticRouteThumbnail({
             <span className="font-medium text-slate-700 dark:text-slate-200">
               {origin.name} → {destination.name}
             </span>
-            <span className="text-[11px]">
-              Verify origin and destination addresses below before logging.
-            </span>
+            <span className="text-[11px]">{t('staticMap.verifyFallback')}</span>
           </div>
         )}
       </div>
@@ -114,7 +117,7 @@ export function StaticRouteThumbnail({
         </div>
         <div className="pt-0.5 flex items-center gap-1 text-[10px] text-slate-400 dark:text-slate-500">
           <MapPin className="w-3 h-3 shrink-0" />
-          <span>Confirm addresses above before saving your trip</span>
+          <span>{t('staticMap.confirmHint')}</span>
         </div>
       </div>
     </div>

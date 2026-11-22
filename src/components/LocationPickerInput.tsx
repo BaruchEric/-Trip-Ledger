@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMapsLibrary } from '@vis.gl/react-google-maps';
 import { Building2, LocateFixed, MapPin, Search, X } from 'lucide-react';
 import { useAutocompleteSuggestions } from '../hooks/useAutocompleteSuggestions';
+import { useI18n } from '../lib/i18n';
 import type { PlaceSelection, StoreLocation } from '../types/mileage';
 
 interface LocationPickerInputProps {
@@ -31,6 +32,7 @@ export function LocationPickerInput({
   findNearestStore,
   accentDotColor,
 }: LocationPickerInputProps) {
+  const { t } = useI18n();
   const placesLib = useMapsLibrary('places');
   const [inputText, setInputText] = useState(value?.name ?? '');
   const [isOpen, setIsOpen] = useState(false);
@@ -188,15 +190,15 @@ export function LocationPickerInput({
           onClick={handleUseCurrentLocation}
           disabled={isLocating}
           className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 disabled:opacity-50 transition-colors whitespace-nowrap"
-          title="Use current GPS location"
+          title={t('loc.useGps')}
         >
           <LocateFixed className="w-3.5 h-3.5" />
-          {isLocating ? 'Locating...' : 'Use GPS'}
+          {isLocating ? t('loc.locating') : t('loc.useGps')}
         </button>
       </div>
 
       <div className="relative">
-        <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+        <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none" />
         <input
           id={id}
           type="text"
@@ -212,7 +214,7 @@ export function LocationPickerInput({
               onChange(null);
             }
           }}
-          className="w-full pl-9 pr-9 py-2.5 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-colors"
+          className="w-full ps-9 pe-9 py-2.5 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600 transition-colors"
         />
         {inputText && (
           <button
@@ -222,8 +224,8 @@ export function LocationPickerInput({
               onChange(null);
               resetSession();
             }}
-            aria-label={`Clear ${label}`}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
+            aria-label={label}
+            className="absolute end-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
           >
             <X className="w-4 h-4" />
           </button>
@@ -241,19 +243,19 @@ export function LocationPickerInput({
       )}
 
       {isOpen && (
-        <div className="absolute z-30 left-0 right-0 mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+        <div className="absolute z-30 inset-x-0 mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
           {/* Discovered Curacao LA Stores */}
           {matchingStores.length > 0 && (
             <div className="py-1.5">
               <div className="px-3 py-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                Curacao Los Angeles Locations
+                {t('loc.curacaoStores')}
               </div>
               {matchingStores.map((store) => (
                 <button
                   key={store.placeId}
                   type="button"
                   onClick={() => handleSelectStore(store)}
-                  className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-start gap-2.5 transition-colors"
+                  className="w-full px-3 py-2 text-start hover:bg-slate-50 dark:hover:bg-slate-800 flex items-start gap-2.5 transition-colors"
                 >
                   <Building2 className="w-4 h-4 text-blue-700 dark:text-blue-400 mt-0.5 shrink-0" />
                   <div className="min-w-0 flex-1">
@@ -261,7 +263,7 @@ export function LocationPickerInput({
                       <span className="truncate">{store.shortName}</span>
                       {store.placeId === homeStorePlaceId && (
                         <span className="text-xs font-medium text-blue-700 dark:text-blue-400 shrink-0">
-                          · Home Store
+                          · {t('loc.homeStore')}
                         </span>
                       )}
                     </div>
@@ -278,12 +280,14 @@ export function LocationPickerInput({
           {queryForAutocomplete.trim().length >= 2 && (
             <div className="py-1.5">
               <div className="px-3 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center justify-between">
-                <span>Addresses &amp; Places</span>
-                {isLoading && <span className="text-slate-400 dark:text-slate-500">Searching...</span>}
+                <span>{t('loc.addressesPlaces')}</span>
+                {isLoading && (
+                  <span className="text-slate-400 dark:text-slate-500">{t('loc.searching')}</span>
+                )}
               </div>
               {suggestions.length === 0 && !isLoading ? (
                 <div className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400">
-                  No additional address matches found.
+                  {t('loc.noMatches')}
                 </div>
               ) : (
                 suggestions.map((suggestion, idx) => {
@@ -294,7 +298,7 @@ export function LocationPickerInput({
                       key={pred.placeId ?? idx}
                       type="button"
                       onClick={() => void handleSelectSuggestion(suggestion)}
-                      className="w-full px-3 py-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800 flex items-start gap-2.5 transition-colors"
+                      className="w-full px-3 py-2 text-start hover:bg-slate-50 dark:hover:bg-slate-800 flex items-start gap-2.5 transition-colors"
                     >
                       <MapPin className="w-4 h-4 text-slate-400 dark:text-slate-500 mt-0.5 shrink-0" />
                       <div className="min-w-0 flex-1">

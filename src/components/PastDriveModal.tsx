@@ -9,6 +9,7 @@ import {
   X,
 } from 'lucide-react';
 import { suggestTripPurpose } from '../lib/purposeSuggestion';
+import { useI18n, type MessageKey } from '../lib/i18n';
 import {
   calculateBillableMiles,
   calculateReimbursement,
@@ -38,12 +39,12 @@ function offsetDateISO(daysAgo: number): string {
   return formatDateISO(dt);
 }
 
-const DATE_PRESETS = [
-  { label: 'Yesterday', daysAgo: 1 },
-  { label: '2 Days Ago', daysAgo: 2 },
-  { label: 'Last Week', daysAgo: 7 },
-  { label: 'Today', daysAgo: 0 },
-] as const;
+const DATE_PRESETS: ReadonlyArray<{ labelKey: MessageKey; daysAgo: number }> = [
+  { labelKey: 'pastDrive.yesterday', daysAgo: 1 },
+  { labelKey: 'pastDrive.twoDaysAgo', daysAgo: 2 },
+  { labelKey: 'pastDrive.lastWeek', daysAgo: 7 },
+  { labelKey: 'pastDrive.today', daysAgo: 0 },
+];
 
 export interface PastDriveModalProps {
   isOpen: boolean;
@@ -93,6 +94,7 @@ export function PastDriveModal({
   onUpdateTrip,
   onDeleteTrip,
 }: PastDriveModalProps) {
+  const { t, tPurpose } = useI18n();
   const routesLib = useMapsLibrary('routes');
   const todayIso = useMemo(() => formatDateISO(), []);
 
@@ -422,15 +424,13 @@ export function PastDriveModal({
                 className="text-sm font-semibold text-slate-900 dark:text-slate-100"
               >
                 {mode === 'edit'
-                  ? 'Edit Past Drive Entry'
+                  ? t('pastDrive.editTitle')
                   : isDuplicateMode
-                    ? 'Duplicate Past Drive Entry'
-                    : 'Add Past Drive Entry'}
+                    ? t('pastDrive.duplicateTitle')
+                    : t('pastDrive.addTitle')}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                {mode === 'edit'
-                  ? 'Update date, stops, mileage, purpose, or notes for this unsubmitted drive.'
-                  : 'Log a previous business drive directly into your reimbursement ledger.'}
+                {mode === 'edit' ? t('pastDrive.editSubtitle') : t('pastDrive.addSubtitle')}
               </p>
             </div>
           </div>
@@ -438,7 +438,7 @@ export function PastDriveModal({
             type="button"
             disabled={isSaving || isDeleting}
             onClick={onClose}
-            aria-label="Close modal"
+            aria-label={t('common.close')}
             className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md transition-colors shrink-0"
           >
             <X className="w-4 h-4" />
@@ -454,7 +454,7 @@ export function PastDriveModal({
                 htmlFor="past-drive-date"
                 className="text-xs font-medium text-slate-700 dark:text-slate-300"
               >
-                Drive Date
+                {t('pastDrive.dateLabel')}
               </label>
               <div className="flex flex-wrap items-center gap-1">
                 {DATE_PRESETS.map((preset) => {
@@ -462,7 +462,7 @@ export function PastDriveModal({
                   const active = tripDate === presetIso;
                   return (
                     <button
-                      key={preset.label}
+                      key={preset.labelKey}
                       type="button"
                       onClick={() => setTripDate(presetIso)}
                       className={`px-2 py-0.5 text-[11px] font-medium rounded transition-colors whitespace-nowrap ${
@@ -471,7 +471,7 @@ export function PastDriveModal({
                           : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-transparent'
                       }`}
                     >
-                      {preset.label}
+                      {t(preset.labelKey)}
                     </button>
                   );
                 })}
@@ -492,8 +492,8 @@ export function PastDriveModal({
           <div className="space-y-2.5">
             <LocationPickerInput
               id="past-drive-origin"
-              label="Origin (Start)"
-              placeholder="Pick a Curacao store or search LA address..."
+              label={t('loc.originLabel')}
+              placeholder={t('loc.originPlaceholder')}
               value={origin}
               onChange={(place) => {
                 setOrigin(place);
@@ -514,7 +514,7 @@ export function PastDriveModal({
                 className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors disabled:opacity-40 whitespace-nowrap"
               >
                 <ArrowUpDown className="w-3 h-3" />
-                Swap
+                {t('common.swap')}
               </button>
               <button
                 type="button"
@@ -527,15 +527,15 @@ export function PastDriveModal({
                 ) : (
                   <Calculator className="w-3 h-3" />
                 )}
-                {isCalculatingRoute ? 'Calculating...' : 'Auto-Fill Route Miles'}
+                {isCalculatingRoute ? t('pastDrive.calculating') : t('pastDrive.autoFillMiles')}
               </button>
               <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
             </div>
 
             <LocationPickerInput
               id="past-drive-destination"
-              label="Destination (Stop)"
-              placeholder="Pick a Curacao store, bank, or LA address..."
+              label={t('loc.destinationLabel')}
+              placeholder={t('loc.destinationPlaceholder')}
               value={destination}
               onChange={(place) => {
                 setDestination(place);
@@ -558,7 +558,7 @@ export function PastDriveModal({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <span className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                Trip Direction
+                {t('logger.tripDirection')}
               </span>
               <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
                 <button
@@ -570,7 +570,7 @@ export function PastDriveModal({
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                   }`}
                 >
-                  One-Way
+                  {t('common.oneWay')}
                 </button>
                 <button
                   type="button"
@@ -581,7 +581,7 @@ export function PastDriveModal({
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                   }`}
                 >
-                  Round Trip
+                  {t('common.roundTrip')}
                 </button>
               </div>
             </div>
@@ -591,11 +591,12 @@ export function PastDriveModal({
                 htmlFor="past-drive-miles"
                 className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
               >
-                One-Way Miles
+                {t('logger.oneWayMiles')}
               </label>
               <input
                 id="past-drive-miles"
                 type="number"
+                dir="ltr"
                 min="0.1"
                 max="2000"
                 step="0.1"
@@ -615,15 +616,16 @@ export function PastDriveModal({
                 htmlFor="past-drive-duration"
                 className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
               >
-                Duration (Min)
+                {t('pastDrive.durationMin')}
               </label>
               <input
                 id="past-drive-duration"
                 type="number"
+                dir="ltr"
                 min="0"
                 max="1440"
                 step="1"
-                placeholder="Optional"
+                placeholder={t('common.optional')}
                 value={durationMinutesStr}
                 onChange={(e) => setDurationMinutesStr(e.target.value)}
                 className="w-full px-3 py-2 text-sm font-mono tabular-nums bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
@@ -638,7 +640,7 @@ export function PastDriveModal({
                 htmlFor="past-drive-purpose"
                 className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
               >
-                Business Purpose
+                {t('logger.businessPurpose')}
               </label>
               <select
                 id="past-drive-purpose"
@@ -651,7 +653,7 @@ export function PastDriveModal({
               >
                 {TRIP_PURPOSES.map((p) => (
                   <option key={p} value={p}>
-                    {p}
+                    {tPurpose(p)}
                   </option>
                 ))}
               </select>
@@ -660,7 +662,7 @@ export function PastDriveModal({
             {purposeSuggestion && purpose !== purposeSuggestion.purpose && (
               <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
                 <span className="truncate">
-                  Suggested: {purposeSuggestion.purpose}
+                  {t('pastDrive.suggested', { purpose: tPurpose(purposeSuggestion.purpose) })}
                 </span>
                 <button
                   type="button"
@@ -670,7 +672,7 @@ export function PastDriveModal({
                   }}
                   className="text-blue-700 dark:text-blue-400 hover:underline font-medium whitespace-nowrap"
                 >
-                  Apply {purposeSuggestion.purpose}
+                  {t('logger.applyPurpose', { purpose: tPurpose(purposeSuggestion.purpose) })}
                 </button>
               </div>
             )}
@@ -684,8 +686,10 @@ export function PastDriveModal({
                   className="mt-0.5 rounded border-slate-300 dark:border-slate-700 text-blue-700 focus:ring-blue-600"
                 />
                 <span>
-                  Subtract normal daily commute ({customCommuteMiles.toFixed(1)} mi{' '}
-                  {isRoundTrip ? 'each way' : 'one-way'})
+                  {t('pastDrive.subtractCommute', {
+                    miles: customCommuteMiles.toFixed(1),
+                    way: isRoundTrip ? t('logger.eachWay') : t('logger.oneWayLower'),
+                  })}
                 </span>
               </label>
             )}
@@ -697,7 +701,7 @@ export function PastDriveModal({
               htmlFor="past-drive-notes"
               className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
             >
-              Notes / Transfer Ticket (Optional)
+              {t('logger.notesLabel')}
             </label>
             <input
               id="past-drive-notes"
@@ -705,7 +709,7 @@ export function PastDriveModal({
               maxLength={FIELD_LIMITS.notes}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="e.g., Retroactive log — Shift coverage at South Gate branch"
+              placeholder={t('pastDrive.notesPlaceholder')}
               className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
             />
           </div>
@@ -713,9 +717,12 @@ export function PastDriveModal({
           {/* Live Reimbursement Summary Strip */}
           <div className="px-3.5 py-2.5 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-between gap-3">
             <div className="text-xs text-slate-600 dark:text-slate-400 font-mono tabular-nums">
-              {billableMiles.toFixed(1)} billable mi × ${ratePerMile.toFixed(2)}/mi
+              {t('pastDrive.billableFormula', {
+                miles: billableMiles.toFixed(1),
+                rate: ratePerMile.toFixed(2),
+              })}
             </div>
-            <div className="text-base font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100">
+            <div dir="ltr" className="text-base font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100">
               {formatCurrency(reimbursementAmount)}
             </div>
           </div>
@@ -741,7 +748,7 @@ export function PastDriveModal({
                     className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg transition-colors whitespace-nowrap"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    Delete Entry
+                    {t('pastDrive.deleteEntry')}
                   </button>
                 ) : (
                   <div className="inline-flex items-center gap-1.5">
@@ -751,7 +758,7 @@ export function PastDriveModal({
                       onClick={() => void handleDeleteConfirmed()}
                       className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg whitespace-nowrap"
                     >
-                      {isDeleting ? 'Deleting...' : 'Confirm Delete'}
+                      {isDeleting ? t('common.deleting') : t('pastDrive.confirmDelete')}
                     </button>
                     <button
                       type="button"
@@ -759,21 +766,21 @@ export function PastDriveModal({
                       onClick={() => setConfirmDelete(false)}
                       className="px-2.5 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 rounded-lg whitespace-nowrap"
                     >
-                      Keep
+                      {t('common.keep')}
                     </button>
                   </div>
                 )
               )}
             </div>
 
-            <div className="flex items-center gap-2 ml-auto shrink-0">
+            <div className="flex items-center gap-2 ms-auto shrink-0">
               <button
                 type="button"
                 disabled={isSaving || isDeleting}
                 onClick={onClose}
                 className="px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="submit"
@@ -781,10 +788,10 @@ export function PastDriveModal({
                 className="px-4 py-2 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 disabled:bg-slate-300 dark:disabled:bg-slate-800 dark:disabled:text-slate-500 disabled:cursor-not-allowed rounded-lg transition-colors whitespace-nowrap"
               >
                 {isSaving
-                  ? 'Saving...'
+                  ? t('common.saving')
                   : mode === 'edit'
-                    ? 'Save Changes'
-                    : 'Add Past Drive'}
+                    ? t('pastDrive.saveChanges')
+                    : t('ledger.addPastDrive')}
               </button>
             </div>
           </div>

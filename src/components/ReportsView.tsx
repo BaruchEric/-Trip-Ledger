@@ -10,10 +10,10 @@ import {
   Printer,
 } from 'lucide-react';
 import { buildReportEmailText, downloadReportCsv } from '../lib/exportUtils';
+import { useI18n } from '../lib/i18n';
 import { downloadReportPdf } from '../lib/pdfReportGenerator';
 import {
   formatCurrency,
-  formatDisplayDate,
   round2,
   type MileageReport,
   type MileageTrip,
@@ -48,6 +48,7 @@ export function ReportsView({
   onMarkReimbursed,
   isDark = false,
 }: ReportsViewProps) {
+  const { t, tPurpose, tExpenseCategory, tStage, formatLocalizedDate } = useI18n();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [pdfSavedId, setPdfSavedId] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -188,18 +189,17 @@ export function ReportsView({
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-10 text-center max-w-lg mx-auto my-8 space-y-4">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          Sign in to generate and archive Mileage Reports
+          {t('reports.signInTitle')}
         </h2>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Generate official printable PDFs, payroll-ready CSV files, and formatted manager emails
-          from your logged trips.
+          {t('reports.signInDesc')}
         </p>
         <button
           type="button"
           onClick={onRequestSignIn}
           className="px-4 py-2.5 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg transition-colors whitespace-nowrap"
         >
-          Sign In with Google
+          {t('auth.signInGoogle')}
         </button>
       </div>
     );
@@ -215,17 +215,25 @@ export function ReportsView({
         <div className="no-print bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {readyTrips.length} unsubmitted {readyTrips.length === 1 ? 'trip' : 'trips'} ready to
-              report
+              {t('reports.readyBannerTitle', {
+                count: readyTrips.length,
+                unit: readyTrips.length === 1 ? t('nav.tripSingular') : t('nav.tripPlural'),
+              })}
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-400 font-mono tabular-nums mt-0.5">
-              {readyTrips.reduce((s, t) => s + t.billableMiles, 0).toFixed(1)} mi ·{' '}
-              {formatCurrency(
-                readyTrips.reduce((s, t) => s + t.reimbursementAmount, 0) + readyExpensesTotal
-              )}{' '}
-              total reimbursement queued
+              <span dir="ltr">
+                {readyTrips.reduce((s, trip) => s + trip.billableMiles, 0).toFixed(1)}{' '}
+                {t('common.mi')}
+              </span>{' '}
+              ·{' '}
+              <span dir="ltr">
+                {formatCurrency(
+                  readyTrips.reduce((s, trip) => s + trip.reimbursementAmount, 0) +
+                    readyExpensesTotal
+                )}
+              </span>
               {readyExpenses.length > 0
-                ? ` (incl. ${formatCurrency(readyExpensesTotal)} in non-mileage expenses)`
+                ? ` (+${formatCurrency(readyExpensesTotal)} ${t('nav.expShort')})`
                 : ''}
             </p>
           </div>
@@ -236,7 +244,7 @@ export function ReportsView({
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap shrink-0"
           >
             <FileCheck2 className="w-4 h-4" />
-            {isGenerating ? 'Generating...' : 'Generate Mileage Report Now'}
+            {isGenerating ? t('reports.generating') : t('reports.generateNow')}
           </button>
         </div>
       )}
@@ -259,11 +267,10 @@ export function ReportsView({
         <div className="no-print bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-12 text-center space-y-3">
           <FileText className="w-8 h-8 text-slate-400 dark:text-slate-500 mx-auto" />
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-            No mileage reports yet
+            {t('reports.emptyTitle')}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-            Log one or more business trips, then click Generate Mileage Report to create an
-            official, printable Curacao reimbursement report and CSV export.
+            {t('reports.emptyDesc')}
           </p>
         </div>
       ) : (
@@ -272,10 +279,16 @@ export function ReportsView({
           <div className="no-print lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Submitted Reports
+                {t('reports.submittedReports')}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {sortedReports.length} {sortedReports.length === 1 ? 'report' : 'reports'} archived
+                {t('reports.archivedCount', {
+                  count: sortedReports.length,
+                  unit:
+                    sortedReports.length === 1
+                      ? t('reports.reportSingular')
+                      : t('reports.reportPlural'),
+                })}
               </p>
             </div>
             <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[640px] overflow-y-auto">
@@ -289,7 +302,7 @@ export function ReportsView({
                     key={rep.id}
                     type="button"
                     onClick={() => onSelectReport(rep.id)}
-                    className={`w-full text-left px-4 py-3.5 transition-colors ${
+                    className={`w-full text-start px-4 py-3.5 transition-colors ${
                       isSelected
                         ? 'bg-blue-50/70 dark:bg-blue-950/50'
                         : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
@@ -306,19 +319,29 @@ export function ReportsView({
                             : 'text-blue-700 dark:text-blue-400'
                         }`}
                       >
-                        {rep.status === 'reimbursed' ? 'Reimbursed' : 'Submitted'}
+                        {rep.status === 'reimbursed'
+                          ? tStage('reimbursed')
+                          : tStage('submitted')}
                       </span>
                     </div>
                     <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-                      {formatDisplayDate(rep.periodStart)} – {formatDisplayDate(rep.periodEnd)}
+                      {formatLocalizedDate(rep.periodStart)} – {formatLocalizedDate(rep.periodEnd)}
                     </div>
                     <div className="mt-1.5 flex items-center justify-between text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
                       <span>
-                        {rep.tripCount} {rep.tripCount === 1 ? 'trip' : 'trips'} ·{' '}
-                        {rep.totalMiles.toFixed(1)} mi
-                        {repExpTotal > 0 ? ` · +${formatCurrency(repExpTotal)} exp` : ''}
+                        {rep.tripCount}{' '}
+                        {rep.tripCount === 1 ? t('nav.tripSingular') : t('nav.tripPlural')} ·{' '}
+                        <span dir="ltr">
+                          {rep.totalMiles.toFixed(1)} {t('common.mi')}
+                        </span>
+                        {repExpTotal > 0
+                          ? ` · +${formatCurrency(repExpTotal)} ${t('nav.expShort')}`
+                          : ''}
                       </span>
-                      <span className="font-semibold text-slate-900 dark:text-slate-100">
+                      <span
+                        className="font-semibold text-slate-900 dark:text-slate-100"
+                        dir="ltr"
+                      >
                         {formatCurrency(repGrandTotal)}
                       </span>
                     </div>
@@ -334,7 +357,7 @@ export function ReportsView({
               {/* Action Toolbar (hidden when printing) */}
               <div className="no-print bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-2.5">
                 <div className="text-xs text-slate-600 dark:text-slate-400">
-                  Report{' '}
+                  {t('reports.reportLabel')}{' '}
                   <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">
                     {activeReport.reportNumber}
                   </span>
@@ -346,7 +369,9 @@ export function ReportsView({
                         : 'text-blue-700 dark:text-blue-400 font-medium'
                     }
                   >
-                    {activeReport.status === 'reimbursed' ? 'Reimbursed' : 'Submitted'}
+                    {activeReport.status === 'reimbursed'
+                      ? tStage('reimbursed')
+                      : tStage('submitted')}
                   </span>
                 </div>
 
@@ -359,12 +384,12 @@ export function ReportsView({
                     {pdfSavedId === activeReport.id ? (
                       <>
                         <Check className="w-3.5 h-3.5" />
-                        PDF Downloaded
+                        {t('reports.pdfDownloaded')}
                       </>
                     ) : (
                       <>
                         <FileDown className="w-3.5 h-3.5" />
-                        Download PDF
+                        {t('reports.downloadPdf')}
                       </>
                     )}
                   </button>
@@ -374,7 +399,7 @@ export function ReportsView({
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap"
                   >
                     <Printer className="w-3.5 h-3.5" />
-                    Print
+                    {t('reports.print')}
                   </button>
                   <button
                     type="button"
@@ -382,7 +407,7 @@ export function ReportsView({
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    Download CSV
+                    {t('reports.downloadCsv')}
                   </button>
                   <button
                     type="button"
@@ -392,12 +417,12 @@ export function ReportsView({
                     {copiedId === activeReport.id ? (
                       <>
                         <Check className="w-3.5 h-3.5 text-emerald-700 dark:text-emerald-400" />
-                        Copied Email
+                        {t('reports.copiedEmail')}
                       </>
                     ) : (
                       <>
                         <Copy className="w-3.5 h-3.5" />
-                        Copy Email Summary
+                        {t('reports.copyEmail')}
                       </>
                     )}
                   </button>
@@ -409,7 +434,7 @@ export function ReportsView({
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border border-emerald-200 dark:border-emerald-800/70 rounded-lg transition-colors whitespace-nowrap disabled:opacity-50"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      {isMarking ? 'Updating...' : 'Mark Reimbursed'}
+                      {isMarking ? t('reports.updating') : t('reports.markReimbursed')}
                     </button>
                   )}
                 </div>
@@ -421,25 +446,25 @@ export function ReportsView({
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-slate-200 dark:border-slate-800 print:border-slate-200">
                   <div>
                     <div className="text-xs font-semibold text-blue-800 dark:text-blue-400 print:text-blue-800 tracking-wide">
-                      CURACAO RETAIL · LOS ANGELES REGION
+                      {t('reports.regionBanner')}
                     </div>
                     <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 print:text-slate-900 mt-1">
-                      Employee Mileage Reimbursement Report
+                      {t('reports.sheetTitle')}
                     </h1>
                     <p className="text-xs text-slate-500 dark:text-slate-400 print:text-slate-500 mt-1">
-                      California Business Expense Reimbursement Log (CA Labor Code § 2802)
+                      {t('reports.sheetLaw')}
                     </p>
                   </div>
-                  <div className="sm:text-right font-mono tabular-nums">
+                  <div className="sm:text-end font-mono tabular-nums">
                     <div className="text-xs text-slate-500 dark:text-slate-400 print:text-slate-500">
-                      Report Reference
+                      {t('reports.reportRef')}
                     </div>
                     <div className="text-base font-bold text-slate-900 dark:text-slate-100 print:text-slate-900">
                       {activeReport.reportNumber}
                     </div>
                     <div className="text-xs text-slate-600 dark:text-slate-400 print:text-slate-600 mt-0.5">
-                      {formatDisplayDate(activeReport.periodStart)} –{' '}
-                      {formatDisplayDate(activeReport.periodEnd)}
+                      {formatLocalizedDate(activeReport.periodStart)} –{' '}
+                      {formatLocalizedDate(activeReport.periodEnd)}
                     </div>
                   </div>
                 </div>
@@ -448,15 +473,15 @@ export function ReportsView({
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 pb-5 border-b border-slate-200 dark:border-slate-800 print:border-slate-200 text-xs">
                   <div>
                     <div className="text-slate-500 dark:text-slate-400 print:text-slate-500">
-                      Employee Name
+                      {t('reports.empName')}
                     </div>
                     <div className="font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900 mt-0.5">
-                      {activeReport.employeeName || 'Not specified'}
+                      {activeReport.employeeName || '—'}
                     </div>
                   </div>
                   <div>
                     <div className="text-slate-500 dark:text-slate-400 print:text-slate-500">
-                      Employee ID
+                      {t('reports.empId')}
                     </div>
                     <div className="font-semibold font-mono text-slate-900 dark:text-slate-100 print:text-slate-900 mt-0.5">
                       {activeReport.employeeId || '—'}
@@ -464,7 +489,7 @@ export function ReportsView({
                   </div>
                   <div>
                     <div className="text-slate-500 dark:text-slate-400 print:text-slate-500">
-                      Department
+                      {t('reports.department')}
                     </div>
                     <div className="font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900 mt-0.5">
                       {activeReport.department || 'Retail Operations'}
@@ -472,7 +497,7 @@ export function ReportsView({
                   </div>
                   <div>
                     <div className="text-slate-500 dark:text-slate-400 print:text-slate-500">
-                      Home Store
+                      {t('reports.homeStore')}
                     </div>
                     <div className="font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900 mt-0.5">
                       {activeReport.homeStoreName || 'Los Angeles Region'}
@@ -480,7 +505,7 @@ export function ReportsView({
                   </div>
                   <div>
                     <div className="text-slate-500 dark:text-slate-400 print:text-slate-500">
-                      Vehicle
+                      {t('reports.vehicle')}
                     </div>
                     <div className="font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900 mt-0.5">
                       {activeReport.vehicleInfo || 'Personal Vehicle'}
@@ -488,72 +513,100 @@ export function ReportsView({
                   </div>
                   <div>
                     <div className="text-slate-500 dark:text-slate-400 print:text-slate-500">
-                      Status
+                      {t('reports.status')}
                     </div>
-                    <div className="font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900 mt-0.5 capitalize">
-                      {activeReport.status}
+                    <div className="font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900 mt-0.5">
+                      {activeReport.status === 'reimbursed'
+                        ? tStage('reimbursed')
+                        : tStage('submitted')}
                     </div>
                   </div>
                 </div>
 
                 {/* Itemized Trip Table */}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
+                  <table className="w-full text-start border-collapse text-xs">
                     <thead>
                       <tr className="border-b border-slate-300 dark:border-slate-700 print:border-slate-300 text-slate-600 dark:text-slate-400 print:text-slate-600 font-semibold">
-                        <th className="py-2 pr-3 whitespace-nowrap">Date</th>
-                        <th className="py-2 px-2">Origin → Destination</th>
-                        <th className="py-2 px-2 whitespace-nowrap">Purpose</th>
-                        <th className="py-2 px-2 text-right whitespace-nowrap">Miles</th>
-                        <th className="py-2 px-2 text-right whitespace-nowrap">Rate</th>
-                        <th className="py-2 pl-2 text-right whitespace-nowrap">Amount</th>
+                        <th className="py-2 pe-3 whitespace-nowrap">{t('ledger.colDate')}</th>
+                        <th className="py-2 px-2">{t('reports.colOriginDest')}</th>
+                        <th className="py-2 px-2 whitespace-nowrap">{t('ledger.colPurpose')}</th>
+                        <th className="py-2 px-2 text-end whitespace-nowrap">
+                          {t('ledger.colMiles')}
+                        </th>
+                        <th className="py-2 px-2 text-end whitespace-nowrap">
+                          {t('reports.colRate')}
+                        </th>
+                        <th className="py-2 ps-2 text-end whitespace-nowrap">
+                          {t('ledger.colAmount')}
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 dark:divide-slate-800 print:divide-slate-200">
-                      {activeTrips.map((t) => (
-                        <tr key={t.id}>
-                          <td className="py-2.5 pr-3 font-mono tabular-nums text-slate-700 dark:text-slate-300 print:text-slate-700 whitespace-nowrap align-top">
-                            {t.tripDate}
+                      {activeTrips.map((trip) => (
+                        <tr key={trip.id}>
+                          <td className="py-2.5 pe-3 font-mono tabular-nums text-slate-700 dark:text-slate-300 print:text-slate-700 whitespace-nowrap align-top">
+                            {trip.tripDate}
                           </td>
                           <td className="py-2.5 px-2 align-top">
                             <div className="font-medium text-slate-900 dark:text-slate-100 print:text-slate-900">
-                              {t.originName} → {t.destinationName}
+                              {trip.originName} → {trip.destinationName}
                             </div>
                             <div className="text-[11px] text-slate-500 dark:text-slate-400 print:text-slate-500 mt-0.5">
-                              {t.isRoundTrip ? 'Round Trip' : 'One-Way'}
-                              {t.commuteDeductionMiles > 0
-                                ? ` · Less ${t.commuteDeductionMiles.toFixed(1)} mi commute`
+                              {trip.isRoundTrip ? t('common.roundTrip') : t('common.oneWay')}
+                              {trip.commuteDeductionMiles > 0
+                                ? ` · −${trip.commuteDeductionMiles.toFixed(1)} ${t('common.mi')}`
                                 : ''}
-                              {t.notes ? ` · ${t.notes}` : ''}
+                              {trip.notes ? ` · ${trip.notes}` : ''}
                             </div>
                           </td>
                           <td className="py-2.5 px-2 text-slate-700 dark:text-slate-300 print:text-slate-700 whitespace-nowrap align-top">
-                            {t.purpose}
+                            {tPurpose(trip.purpose)}
                           </td>
-                          <td className="py-2.5 px-2 text-right font-mono tabular-nums text-slate-900 dark:text-slate-100 print:text-slate-900 whitespace-nowrap align-top">
-                            {t.billableMiles.toFixed(1)}
+                          <td
+                            className="py-2.5 px-2 text-end font-mono tabular-nums text-slate-900 dark:text-slate-100 print:text-slate-900 whitespace-nowrap align-top"
+                            dir="ltr"
+                          >
+                            {trip.billableMiles.toFixed(1)}
                           </td>
-                          <td className="py-2.5 px-2 text-right font-mono tabular-nums text-slate-600 dark:text-slate-400 print:text-slate-600 whitespace-nowrap align-top">
-                            ${t.ratePerMile.toFixed(2)}
+                          <td
+                            className="py-2.5 px-2 text-end font-mono tabular-nums text-slate-600 dark:text-slate-400 print:text-slate-600 whitespace-nowrap align-top"
+                            dir="ltr"
+                          >
+                            ${trip.ratePerMile.toFixed(2)}
                           </td>
-                          <td className="py-2.5 pl-2 text-right font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900 whitespace-nowrap align-top">
-                            {formatCurrency(t.reimbursementAmount)}
+                          <td
+                            className="py-2.5 ps-2 text-end font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900 whitespace-nowrap align-top"
+                            dir="ltr"
+                          >
+                            {formatCurrency(trip.reimbursementAmount)}
                           </td>
                         </tr>
                       ))}
                     </tbody>
                     <tfoot>
                       <tr className="border-t-2 border-slate-900 dark:border-slate-300 print:border-slate-900 font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900">
-                        <td colSpan={3} className="py-3 pr-3">
-                          {activeExpenses.length > 0 ? 'Mileage Subtotal' : 'Total'} (
-                          {activeReport.tripCount}{' '}
-                          {activeReport.tripCount === 1 ? 'trip' : 'trips'})
+                        <td colSpan={3} className="py-3 pe-3">
+                          {activeExpenses.length > 0
+                            ? t('reports.mileageSubtotal')
+                            : t('reports.total')}{' '}
+                          ({activeReport.tripCount}{' '}
+                          {activeReport.tripCount === 1
+                            ? t('nav.tripSingular')
+                            : t('nav.tripPlural')}
+                          )
                         </td>
-                        <td className="py-3 px-2 text-right font-mono tabular-nums whitespace-nowrap">
-                          {activeReport.totalMiles.toFixed(1)} mi
+                        <td
+                          className="py-3 px-2 text-end font-mono tabular-nums whitespace-nowrap"
+                          dir="ltr"
+                        >
+                          {activeReport.totalMiles.toFixed(1)} {t('common.mi')}
                         </td>
                         <td className="py-3 px-2" />
-                        <td className="py-3 pl-2 text-right font-mono tabular-nums text-sm whitespace-nowrap">
+                        <td
+                          className="py-3 ps-2 text-end font-mono tabular-nums text-sm whitespace-nowrap"
+                          dir="ltr"
+                        >
                           {formatCurrency(activeReport.totalReimbursement)}
                         </td>
                       </tr>
@@ -565,16 +618,20 @@ export function ReportsView({
                 {activeExpenses.length > 0 && (
                   <div className="space-y-3 pt-2">
                     <h2 className="text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-300 print:text-slate-700">
-                      Non-Mileage Business Expenses (Parking, Tolls &amp; Other)
+                      {t('reports.nonMileageHeader')}
                     </h2>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-left border-collapse text-xs">
+                      <table className="w-full text-start border-collapse text-xs">
                         <thead>
                           <tr className="border-b border-slate-300 dark:border-slate-700 print:border-slate-300 text-slate-600 dark:text-slate-400 print:text-slate-600 font-semibold">
-                            <th className="py-2 pr-3 whitespace-nowrap">Date</th>
-                            <th className="py-2 px-2 whitespace-nowrap">Category</th>
-                            <th className="py-2 px-2">Description &amp; Associated Trip</th>
-                            <th className="py-2 pl-2 text-right whitespace-nowrap">Amount</th>
+                            <th className="py-2 pe-3 whitespace-nowrap">{t('ledger.colDate')}</th>
+                            <th className="py-2 px-2 whitespace-nowrap">
+                              {t('reports.colCategory')}
+                            </th>
+                            <th className="py-2 px-2">{t('reports.colDescTrip')}</th>
+                            <th className="py-2 ps-2 text-end whitespace-nowrap">
+                              {t('ledger.colAmount')}
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200 dark:divide-slate-800 print:divide-slate-200">
@@ -582,11 +639,11 @@ export function ReportsView({
                             const linked = exp.tripId ? activeTripById[exp.tripId] : undefined;
                             return (
                               <tr key={exp.id}>
-                                <td className="py-2 pr-3 font-mono tabular-nums text-slate-700 dark:text-slate-300 print:text-slate-700 whitespace-nowrap align-top">
+                                <td className="py-2 pe-3 font-mono tabular-nums text-slate-700 dark:text-slate-300 print:text-slate-700 whitespace-nowrap align-top">
                                   {exp.expenseDate}
                                 </td>
                                 <td className="py-2 px-2 font-medium text-slate-800 dark:text-slate-200 print:text-slate-800 whitespace-nowrap align-top">
-                                  {exp.category}
+                                  {tExpenseCategory(exp.category)}
                                 </td>
                                 <td className="py-2 px-2 align-top">
                                   <div className="font-medium text-slate-900 dark:text-slate-100 print:text-slate-900">
@@ -595,14 +652,17 @@ export function ReportsView({
                                   {(linked || exp.notes) && (
                                     <div className="text-[11px] text-slate-500 dark:text-slate-400 print:text-slate-500 mt-0.5">
                                       {linked
-                                        ? `Trip: ${linked.originName} → ${linked.destinationName}`
+                                        ? `${t('logger.tripPrefix')} ${linked.originName} → ${linked.destinationName}`
                                         : ''}
                                       {linked && exp.notes ? ' · ' : ''}
                                       {exp.notes}
                                     </div>
                                   )}
                                 </td>
-                                <td className="py-2 pl-2 text-right font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900 whitespace-nowrap align-top">
+                                <td
+                                  className="py-2 ps-2 text-end font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900 whitespace-nowrap align-top"
+                                  dir="ltr"
+                                >
                                   {formatCurrency(exp.amount)}
                                 </td>
                               </tr>
@@ -611,11 +671,13 @@ export function ReportsView({
                         </tbody>
                         <tfoot>
                           <tr className="border-t border-slate-400 dark:border-slate-600 print:border-slate-400 font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900">
-                            <td colSpan={3} className="py-2.5 pr-3">
-                              Non-Mileage Expenses Subtotal ({activeExpenses.length}{' '}
-                              {activeExpenses.length === 1 ? 'item' : 'items'})
+                            <td colSpan={3} className="py-2.5 pe-3">
+                              {t('reports.expensesSubtotal')} ({activeExpenses.length})
                             </td>
-                            <td className="py-2.5 pl-2 text-right font-mono tabular-nums whitespace-nowrap">
+                            <td
+                              className="py-2.5 ps-2 text-end font-mono tabular-nums whitespace-nowrap"
+                              dir="ltr"
+                            >
                               {formatCurrency(activeExpensesSubtotal)}
                             </td>
                           </tr>
@@ -626,11 +688,17 @@ export function ReportsView({
                     {/* Combined Grand Total Bar */}
                     <div className="px-4 py-3 bg-blue-50/80 dark:bg-blue-950/50 print:bg-blue-50 border border-blue-200 dark:border-blue-800/80 print:border-blue-200 rounded-lg flex flex-wrap items-center justify-between gap-2">
                       <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900">
-                        Grand Total Reimbursement Due (Mileage{' '}
-                        {formatCurrency(activeReport.totalReimbursement)} + Expenses{' '}
-                        {formatCurrency(activeExpensesSubtotal)})
+                        {t('reports.grandTotal')} (
+                        <span dir="ltr">
+                          {formatCurrency(activeReport.totalReimbursement)} +{' '}
+                          {formatCurrency(activeExpensesSubtotal)}
+                        </span>
+                        )
                       </span>
-                      <span className="text-base font-bold font-mono tabular-nums text-blue-800 dark:text-blue-300 print:text-blue-800">
+                      <span
+                        className="text-base font-bold font-mono tabular-nums text-blue-800 dark:text-blue-300 print:text-blue-800"
+                        dir="ltr"
+                      >
                         {formatCurrency(
                           round2(activeReport.totalReimbursement + activeExpensesSubtotal)
                         )}
@@ -642,23 +710,21 @@ export function ReportsView({
                 {/* Employee Certification & Manager Approval Signature Lines */}
                 <div className="pt-6 border-t border-slate-200 dark:border-slate-800 print:border-slate-200 space-y-6">
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 print:text-slate-500 leading-relaxed">
-                    I certify that the mileage listed above was driven on authorized Curacao
-                    company business using my personal vehicle and that all distances and expenses
-                    are accurate to the best of my knowledge.
+                    {t('reports.certText')}
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 pt-2 text-xs">
                     <div>
                       <div className="border-b border-slate-400 dark:border-slate-600 print:border-slate-400 h-7" />
                       <div className="mt-1.5 flex items-center justify-between text-slate-600 dark:text-slate-400 print:text-slate-600">
-                        <span>Employee Signature</span>
-                        <span>Date</span>
+                        <span>{t('reports.empSignature')}</span>
+                        <span>{t('ledger.colDate')}</span>
                       </div>
                     </div>
                     <div>
                       <div className="border-b border-slate-400 dark:border-slate-600 print:border-slate-400 h-7" />
                       <div className="mt-1.5 flex items-center justify-between text-slate-600 dark:text-slate-400 print:text-slate-600">
-                        <span>Store Manager / HR Approval</span>
-                        <span>Date</span>
+                        <span>{t('reports.mgrApproval')}</span>
+                        <span>{t('ledger.colDate')}</span>
                       </div>
                     </div>
                   </div>

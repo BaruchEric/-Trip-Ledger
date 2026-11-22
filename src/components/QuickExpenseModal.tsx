@@ -11,12 +11,12 @@ import {
   X,
 } from 'lucide-react';
 import { suggestExpenseCategory } from '../lib/expenseCategorizer';
+import { useI18n } from '../lib/i18n';
 import {
   EXPENSE_CATEGORIES,
   FIELD_LIMITS,
   formatCurrency,
   formatDateISO,
-  formatDisplayDate,
   round2,
   type ExpenseCategory,
   type MileageTrip,
@@ -76,6 +76,7 @@ export function QuickExpenseModal({
   onClose,
   onSaveExpense,
 }: QuickExpenseModalProps) {
+  const { t, tExpenseCategory, formatLocalizedDate } = useI18n();
   const sortedTrips = useMemo(
     () =>
       [...trips].sort((a, b) => {
@@ -221,10 +222,10 @@ export function QuickExpenseModal({
                 id="quick-expense-modal-title"
                 className="text-sm font-semibold text-slate-900 dark:text-slate-100"
               >
-                Quick Expense
+                {t('expense.title')}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                Log parking, fuel, tolls, or other non-mileage costs for PDF reimbursement reports.
+                {t('expense.subtitle')}
               </p>
             </div>
           </div>
@@ -232,7 +233,7 @@ export function QuickExpenseModal({
             type="button"
             onClick={onClose}
             disabled={isSaving}
-            aria-label="Close Quick Expense"
+            aria-label={t('common.close')}
             className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md transition-colors shrink-0"
           >
             <X className="w-4 h-4" />
@@ -247,7 +248,7 @@ export function QuickExpenseModal({
               htmlFor="expense-description"
               className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
             >
-              Merchant / Location Description
+              {t('expense.descLabel')}
             </label>
             <input
               id="expense-description"
@@ -256,7 +257,7 @@ export function QuickExpenseModal({
               maxLength={FIELD_LIMITS.expenseDescription}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g., DTLA Parking Garage, Chevron Gas, or FasTrak Toll"
+              placeholder={t('expense.descPlaceholder')}
               className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
             />
             {categorySuggestion ? (
@@ -267,22 +268,30 @@ export function QuickExpenseModal({
                 <span className="truncate">
                   {category === categorySuggestion.category ? (
                     <>
-                      Auto-selected{' '}
+                      {t('expense.autoSelected')}{' '}
                       <span className="font-medium text-slate-700 dark:text-slate-200">
-                        {categorySuggestion.category}
+                        {tExpenseCategory(categorySuggestion.category)}
                       </span>
-                      {categorySuggestion.source === 'history' ? ' from past expenses' : ''}
+                      {categorySuggestion.source === 'history' ? t('expense.fromHistory') : ''}
                       {categorySuggestion.matchedKeywords.length > 0
-                        ? ` · matched ${categorySuggestion.matchedKeywords.join(', ')}`
+                        ? t('expense.matched', {
+                            keywords: categorySuggestion.matchedKeywords.join(', '),
+                          })
                         : ''}
                     </>
                   ) : (
                     <>
                       {categorySuggestion.source === 'history'
-                        ? `Past expenses suggest ${categorySuggestion.category}`
-                        : `Keywords suggest ${categorySuggestion.category}`}
+                        ? t('expense.historySuggests', {
+                            category: tExpenseCategory(categorySuggestion.category),
+                          })
+                        : t('expense.keywordsSuggest', {
+                            category: tExpenseCategory(categorySuggestion.category),
+                          })}
                       {categorySuggestion.matchedKeywords.length > 0
-                        ? ` · matched ${categorySuggestion.matchedKeywords.join(', ')}`
+                        ? t('expense.matched', {
+                            keywords: categorySuggestion.matchedKeywords.join(', '),
+                          })
                         : ''}
                     </>
                   )}
@@ -296,13 +305,15 @@ export function QuickExpenseModal({
                     }}
                     className="text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium whitespace-nowrap shrink-0"
                   >
-                    Apply {categorySuggestion.category}
+                    {t('expense.applyCategory', {
+                      category: tExpenseCategory(categorySuggestion.category),
+                    })}
                   </button>
                 )}
               </div>
             ) : (
               <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                Type keywords like parking, gas, toll, or supplies to auto-select a category.
+                {t('expense.hint')}
               </p>
             )}
           </div>
@@ -311,11 +322,11 @@ export function QuickExpenseModal({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                Expense Category
+                {t('expense.categoryLabel')}
               </span>
               {!categoryTouchedManually && categorySuggestion && (
                 <span className="text-[11px] text-blue-700 dark:text-blue-400 font-medium">
-                  Auto-matched
+                  {t('expense.autoMatched')}
                 </span>
               )}
             </div>
@@ -339,7 +350,7 @@ export function QuickExpenseModal({
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">{cat}</span>
+                    <span className="truncate">{tExpenseCategory(cat)}</span>
                   </button>
                 );
               })}
@@ -354,9 +365,9 @@ export function QuickExpenseModal({
                   htmlFor="expense-amount"
                   className="text-xs font-medium text-slate-700 dark:text-slate-300"
                 >
-                  Amount (USD)
+                  {t('expense.amountLabel')}
                 </label>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1" dir="ltr">
                   {QUICK_AMOUNTS.map((amt) => (
                     <button
                       key={amt}
@@ -370,10 +381,11 @@ export function QuickExpenseModal({
                 </div>
               </div>
               <div className="relative">
-                <DollarSign className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <DollarSign className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   id="expense-amount"
                   type="number"
+                  dir="ltr"
                   min="0.01"
                   max="5000"
                   step="0.01"
@@ -381,7 +393,7 @@ export function QuickExpenseModal({
                   value={amountStr}
                   onChange={(e) => setAmountStr(e.target.value)}
                   placeholder="0.00"
-                  className="w-full pl-8 pr-3 py-2 text-sm font-mono tabular-nums bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                  className="w-full ps-8 pe-3 py-2 text-sm font-mono tabular-nums bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
                 />
               </div>
             </div>
@@ -391,7 +403,7 @@ export function QuickExpenseModal({
                 htmlFor="expense-date"
                 className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
               >
-                Expense Date
+                {t('expense.dateLabel')}
               </label>
               <input
                 id="expense-date"
@@ -410,7 +422,7 @@ export function QuickExpenseModal({
               htmlFor="expense-trip"
               className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
             >
-              Associated Trip (Optional)
+              {t('expense.associatedTrip')}
             </label>
             <select
               id="expense-trip"
@@ -418,17 +430,16 @@ export function QuickExpenseModal({
               onChange={(e) => handleTripSelect(e.target.value)}
               className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
             >
-              <option value="">General workday business expense (no specific trip)</option>
-              {sortedTrips.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {formatDisplayDate(t.tripDate)} · {t.originName} → {t.destinationName} (
-                  {t.billableMiles.toFixed(1)} mi)
+              <option value="">{t('expense.generalExpense')}</option>
+              {sortedTrips.map((trip) => (
+                <option key={trip.id} value={trip.id}>
+                  {formatLocalizedDate(trip.tripDate)} · {trip.originName} → {trip.destinationName}{' '}
+                  ({trip.billableMiles.toFixed(1)} {t('common.mi')})
                 </option>
               ))}
             </select>
             <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-              Linked expenses automatically appear on that trip&apos;s receipt and its combined PDF
-              reimbursement report.
+              {t('expense.linkedHint')}
             </p>
           </div>
 
@@ -438,7 +449,7 @@ export function QuickExpenseModal({
               htmlFor="expense-notes"
               className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
             >
-              Receipt # or Notes (Optional)
+              {t('expense.notesLabel')}
             </label>
             <input
               id="expense-notes"
@@ -465,14 +476,14 @@ export function QuickExpenseModal({
             <div className="text-xs font-mono tabular-nums text-slate-600 dark:text-slate-400">
               {validAmount ? (
                 <>
-                  Adding{' '}
-                  <span className="font-semibold text-slate-900 dark:text-slate-100">
+                  {t('expense.adding')}{' '}
+                  <span dir="ltr" className="font-semibold text-slate-900 dark:text-slate-100">
                     {formatCurrency(round2(parsedAmount))}
                   </span>{' '}
-                  ({category})
+                  ({tExpenseCategory(category)})
                 </>
               ) : (
-                'Enter amount to log'
+                t('expense.enterAmount')
               )}
             </div>
             <div className="flex items-center gap-2 shrink-0">
@@ -482,14 +493,14 @@ export function QuickExpenseModal({
                 onClick={onClose}
                 className="px-3.5 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 type="submit"
                 disabled={!validAmount || isSaving}
                 className="px-4 py-2 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 disabled:bg-slate-300 dark:disabled:bg-slate-800 dark:disabled:text-slate-500 disabled:cursor-not-allowed rounded-lg transition-colors whitespace-nowrap"
               >
-                {isSaving ? 'Saving...' : 'Save Expense'}
+                {isSaving ? t('common.saving') : t('expense.saveExpense')}
               </button>
             </div>
           </div>

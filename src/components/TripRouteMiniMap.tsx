@@ -22,9 +22,9 @@ import {
   Route as RouteIcon,
   X,
 } from 'lucide-react';
+import { useI18n } from '../lib/i18n';
 import {
   formatCurrency,
-  formatDisplayDate,
   round1,
   type MileageTrip,
   type StoreLocation,
@@ -351,6 +351,7 @@ export function TripRouteMiniMap({
   onOpenReport,
   onClose,
 }: TripRouteMiniMapProps) {
+  const { t, tPurpose, tExpenseCategory, tStage, formatLocalizedDate } = useI18n();
   const [routeLoading, setRouteLoading] = useState(true);
   const [routeError, setRouteError] = useState<string | null>(null);
   const [endpoints, setEndpoints] = useState<ResolvedEndpoints>({
@@ -402,11 +403,11 @@ export function TripRouteMiniMap({
       <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 dark:bg-slate-900/70">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-            <span>{formatDisplayDate(trip.tripDate)}</span>
+            <span>{formatLocalizedDate(trip.tripDate)}</span>
             <span aria-hidden="true">·</span>
-            <span>{trip.purpose}</span>
+            <span>{tPurpose(trip.purpose)}</span>
             <span aria-hidden="true">·</span>
-            <span>{trip.isRoundTrip ? 'Round Trip' : 'One-Way'}</span>
+            <span>{trip.isRoundTrip ? t('common.roundTrip') : t('common.oneWay')}</span>
           </div>
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate mt-0.5">
             {trip.originName} → {trip.destinationName}
@@ -415,7 +416,7 @@ export function TripRouteMiniMap({
 
         <div className="flex flex-wrap items-center gap-1.5 shrink-0">
           {totalTrips > 1 && (
-            <div className="inline-flex items-center gap-1 mr-1">
+            <div className="inline-flex items-center gap-1 me-1" dir="ltr">
               <button
                 type="button"
                 onClick={onPrevTrip}
@@ -447,7 +448,7 @@ export function TripRouteMiniMap({
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-md transition-colors whitespace-nowrap"
             >
               <Pencil className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-              Edit
+              {t('common.edit')}
             </button>
           )}
 
@@ -458,7 +459,7 @@ export function TripRouteMiniMap({
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-md transition-colors whitespace-nowrap"
             >
               <Copy className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" />
-              Duplicate
+              {t('common.duplicate')}
             </button>
           )}
 
@@ -469,7 +470,7 @@ export function TripRouteMiniMap({
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-md transition-colors whitespace-nowrap"
             >
               <Receipt className="w-3.5 h-3.5 text-blue-700 dark:text-blue-400" />
-              Add Expense
+              {t('logger.addExpense')}
             </button>
           )}
 
@@ -482,12 +483,12 @@ export function TripRouteMiniMap({
               {pdfDownloaded ? (
                 <>
                   <Check className="w-3.5 h-3.5" />
-                  Receipt Saved
+                  {t('miniMap.receiptSaved')}
                 </>
               ) : (
                 <>
                   <FileDown className="w-3.5 h-3.5" />
-                  Download as PDF
+                  {t('miniMap.downloadPdf')}
                 </>
               )}
             </button>
@@ -500,13 +501,13 @@ export function TripRouteMiniMap({
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50 rounded-md transition-colors whitespace-nowrap"
           >
             <Crosshair className="w-3.5 h-3.5" />
-            Recenter
+            {t('miniMap.recenter')}
           </button>
 
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close route preview"
+            aria-label={t('common.close')}
             className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-md transition-colors"
           >
             <X className="w-3.5 h-3.5" />
@@ -517,7 +518,7 @@ export function TripRouteMiniMap({
       {/* Horizontal Split: Interactive Mini-Map + Trip Route Details */}
       <div className="grid grid-cols-1 lg:grid-cols-12">
         {/* Interactive Google Map Canvas (explicit height per CF2) */}
-        <div className="lg:col-span-7 relative h-[280px] sm:h-[310px] w-full bg-slate-100 dark:bg-slate-950 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800">
+        <div className="lg:col-span-7 relative h-[280px] sm:h-[310px] w-full bg-slate-100 dark:bg-slate-950 border-b lg:border-b-0 lg:border-e border-slate-200 dark:border-slate-800">
           <GoogleMap
             mapId="DEMO_MAP_ID"
             defaultCenter={LA_DEFAULT_CENTER}
@@ -569,7 +570,9 @@ export function TripRouteMiniMap({
             {activePin === 'origin' && endpoints.origin && (
               <InfoWindow position={endpoints.origin} onCloseClick={() => setActivePin(null)}>
                 <div className="p-1 max-w-[220px]">
-                  <div className="text-xs font-semibold text-emerald-800">Origin (A)</div>
+                  <div className="text-xs font-semibold text-emerald-800">
+                    {t('miniMap.originA')}
+                  </div>
                   <div className="text-xs font-semibold text-slate-900 mt-0.5">
                     {trip.originName}
                   </div>
@@ -585,7 +588,9 @@ export function TripRouteMiniMap({
             {activePin === 'destination' && endpoints.destination && (
               <InfoWindow position={endpoints.destination} onCloseClick={() => setActivePin(null)}>
                 <div className="p-1 max-w-[220px]">
-                  <div className="text-xs font-semibold text-amber-800">Destination (B)</div>
+                  <div className="text-xs font-semibold text-amber-800">
+                    {t('miniMap.destB')}
+                  </div>
                   <div className="text-xs font-semibold text-slate-900 mt-0.5">
                     {trip.destinationName}
                   </div>
@@ -603,7 +608,7 @@ export function TripRouteMiniMap({
             <div className="absolute inset-0 bg-white/65 dark:bg-slate-950/70 backdrop-blur-[1px] flex items-center justify-center pointer-events-none">
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm text-xs font-medium text-slate-700 dark:text-slate-200">
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-700 dark:text-blue-400" />
-                Loading route path...
+                {t('miniMap.loadingRoute')}
               </div>
             </div>
           )}
@@ -611,7 +616,7 @@ export function TripRouteMiniMap({
           {routeError && !routeLoading && (
             <div
               role="alert"
-              className="absolute left-3 right-3 bottom-3 px-3 py-2 bg-amber-50 dark:bg-amber-950/90 border border-amber-300 dark:border-amber-800 rounded-lg text-xs text-amber-950 dark:text-amber-100 shadow-sm"
+              className="absolute inset-x-3 bottom-3 px-3 py-2 bg-amber-50 dark:bg-amber-950/90 border border-amber-300 dark:border-amber-800 rounded-lg text-xs text-amber-950 dark:text-amber-100 shadow-sm"
             >
               {routeError}
             </div>
@@ -624,25 +629,38 @@ export function TripRouteMiniMap({
             {/* Key Metrics Row */}
             <div className="grid grid-cols-3 gap-3 pb-3 border-b border-slate-100 dark:border-slate-800">
               <div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">Billable Miles</div>
-                <div className="text-base font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100 mt-0.5">
-                  {trip.billableMiles.toFixed(1)} mi
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {t('miniMap.billableMiles')}
+                </div>
+                <div
+                  className="text-base font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100 mt-0.5"
+                  dir="ltr"
+                >
+                  {trip.billableMiles.toFixed(1)} {t('common.mi')}
                 </div>
               </div>
               <div>
                 <div className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {expenses.length > 0 ? 'Total Reimb.' : 'Reimbursement'}
+                  {expenses.length > 0 ? t('miniMap.totalReimb') : t('miniMap.reimbursement')}
                 </div>
-                <div className="text-base font-bold font-mono tabular-nums text-blue-800 dark:text-blue-400 mt-0.5">
+                <div
+                  className="text-base font-bold font-mono tabular-nums text-blue-800 dark:text-blue-400 mt-0.5"
+                  dir="ltr"
+                >
                   {formatCurrency(
                     trip.reimbursementAmount + expenses.reduce((sum, e) => sum + e.amount, 0)
                   )}
                 </div>
               </div>
               <div>
-                <div className="text-[11px] text-slate-500 dark:text-slate-400">Est. Drive</div>
-                <div className="text-base font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100 mt-0.5">
-                  {displayDuration ? `${displayDuration} min` : '—'}
+                <div className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {t('miniMap.estDrive')}
+                </div>
+                <div
+                  className="text-base font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100 mt-0.5"
+                  dir="ltr"
+                >
+                  {displayDuration ? `${displayDuration} ${t('common.min')}` : '—'}
                 </div>
               </div>
             </div>
@@ -727,7 +745,7 @@ export function TripRouteMiniMap({
 
               {trip.notes && (
                 <p className="text-slate-700 dark:text-slate-300 pt-1 leading-snug">
-                  <span className="text-slate-500 dark:text-slate-400">Notes: </span>
+                  <span className="text-slate-500 dark:text-slate-400">{t('miniMap.notes')} </span>
                   {trip.notes}
                 </p>
               )}
@@ -735,7 +753,7 @@ export function TripRouteMiniMap({
               {expenses.length > 0 && (
                 <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1">
                   <div className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                    Associated Expenses ({expenses.length})
+                    {t('miniMap.associatedExpenses', { count: expenses.length })}
                   </div>
                   {expenses.map((exp) => (
                     <div
@@ -743,9 +761,12 @@ export function TripRouteMiniMap({
                       className="flex items-center justify-between gap-2 text-[11px] text-slate-600 dark:text-slate-300"
                     >
                       <span className="truncate">
-                        {exp.category} — {exp.description}
+                        {tExpenseCategory(exp.category)} — {exp.description}
                       </span>
-                      <span className="font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100 shrink-0">
+                      <span
+                        className="font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100 shrink-0"
+                        dir="ltr"
+                      >
                         {formatCurrency(exp.amount)}
                       </span>
                     </div>
@@ -759,7 +780,7 @@ export function TripRouteMiniMap({
           <div className="pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 text-xs">
             <span className="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
               <MapPin className="w-3.5 h-3.5 text-blue-700 dark:text-blue-400" />
-              Click pins A or B for stop details
+              {t('miniMap.clickPinsHint')}
             </span>
             {trip.status === 'submitted' && reportNumber && onOpenReport ? (
               <button
@@ -771,16 +792,18 @@ export function TripRouteMiniMap({
                     : 'text-blue-700 dark:text-blue-400'
                 }`}
               >
-                {stage === 'reimbursed' ? 'Reimbursed · ' : 'Report '}
+                {stage === 'reimbursed'
+                  ? `${tStage('reimbursed')} · `
+                  : `${t('reports.reportLabel')} `}
                 {reportNumber}
               </button>
             ) : (
               <span className="font-medium text-amber-700 dark:text-amber-400 whitespace-nowrap">
                 {stage === 'reimbursed'
-                  ? 'Reimbursed'
+                  ? tStage('reimbursed')
                   : trip.status === 'ready'
-                    ? 'Ready to Submit'
-                    : 'Submitted'}
+                    ? t('ledger.readyToSubmit')
+                    : tStage('submitted')}
               </span>
             )}
           </div>

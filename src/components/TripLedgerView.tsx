@@ -20,10 +20,10 @@ import {
   X,
 } from 'lucide-react';
 import { downloadTripsCsv } from '../lib/exportUtils';
+import { useI18n, type MessageKey } from '../lib/i18n';
 import { downloadTripReceiptPdf } from '../lib/pdfReportGenerator';
 import {
   formatCurrency,
-  formatDisplayDate,
   TRIP_PURPOSES,
   type MileageReport,
   type MileageTrip,
@@ -67,13 +67,13 @@ type TripSortOption =
   | 'destination_asc'
   | 'destination_desc';
 
-const SORT_OPTIONS: Array<{ value: TripSortOption; label: string }> = [
-  { value: 'date_desc', label: 'Date: Newest First' },
-  { value: 'date_asc', label: 'Date: Oldest First' },
-  { value: 'amount_desc', label: 'Reimbursement: High to Low' },
-  { value: 'amount_asc', label: 'Reimbursement: Low to High' },
-  { value: 'destination_asc', label: 'Destination: A to Z' },
-  { value: 'destination_desc', label: 'Destination: Z to A' },
+const SORT_OPTIONS: Array<{ value: TripSortOption; labelKey: MessageKey }> = [
+  { value: 'date_desc', labelKey: 'sort.date_desc' },
+  { value: 'date_asc', labelKey: 'sort.date_asc' },
+  { value: 'amount_desc', labelKey: 'sort.amount_desc' },
+  { value: 'amount_asc', labelKey: 'sort.amount_asc' },
+  { value: 'destination_asc', labelKey: 'sort.destination_asc' },
+  { value: 'destination_desc', labelKey: 'sort.destination_desc' },
 ];
 
 function getTripStage(
@@ -161,6 +161,7 @@ export function TripLedgerView({
   onOpenQuickExpense,
   onOpenReport,
 }: TripLedgerViewProps) {
+  const { t, tPurpose, tStage, formatLocalizedDate } = useI18n();
   const [statusFilter, setStatusFilter] = useState<'all' | TripStage>('all');
   const [sortBy, setSortBy] = useState<TripSortOption>('date_desc');
   const [searchQuery, setSearchQuery] = useState('');
@@ -233,21 +234,25 @@ export function TripLedgerView({
       })
       .filter((t) => (purposeFilter === 'all' ? true : t.purpose === purposeFilter))
       .filter((t) => (!dateFilter ? true : t.tripDate === dateFilter))
-      .filter((t) => {
+      .filter((trip) => {
         if (!q) return true;
-        const formattedDate = formatDisplayDate(t.tripDate).toLowerCase();
-        const reportRef = (reportById[t.reportId]?.reportNumber ?? '').toLowerCase();
-        const stage = getTripStage(t, reportById);
+        const formattedDate = formatLocalizedDate(trip.tripDate).toLowerCase();
+        const reportRef = (reportById[trip.reportId]?.reportNumber ?? '').toLowerCase();
+        const stage = getTripStage(trip, reportById);
+        const localizedPurpose = tPurpose(trip.purpose).toLowerCase();
+        const localizedStage = tStage(stage).toLowerCase();
         return (
-          t.destinationName.toLowerCase().includes(q) ||
-          t.destinationAddress.toLowerCase().includes(q) ||
-          t.originName.toLowerCase().includes(q) ||
-          t.purpose.toLowerCase().includes(q) ||
-          t.notes.toLowerCase().includes(q) ||
-          t.tripDate.includes(q) ||
+          trip.destinationName.toLowerCase().includes(q) ||
+          trip.destinationAddress.toLowerCase().includes(q) ||
+          trip.originName.toLowerCase().includes(q) ||
+          trip.purpose.toLowerCase().includes(q) ||
+          localizedPurpose.includes(q) ||
+          trip.notes.toLowerCase().includes(q) ||
+          trip.tripDate.includes(q) ||
           formattedDate.includes(q) ||
           reportRef.includes(q) ||
-          stage.includes(q)
+          stage.includes(q) ||
+          localizedStage.includes(q)
         );
       })
       .sort((a, b) => {
@@ -287,7 +292,18 @@ export function TripLedgerView({
             return tieBreak();
         }
       });
-  }, [trips, statusFilter, purposeFilter, dateFilter, searchQuery, sortBy, reportById]);
+  }, [
+    trips,
+    statusFilter,
+    purposeFilter,
+    dateFilter,
+    searchQuery,
+    sortBy,
+    reportById,
+    formatLocalizedDate,
+    tPurpose,
+    tStage,
+  ]);
 
   const inspectedTripIndex = useMemo(
     () => (inspectedTripId ? filteredTrips.findIndex((t) => t.id === inspectedTripId) : -1),
@@ -494,14 +510,14 @@ export function TripLedgerView({
   const handleCreatePastDrive = async (input: NewTripInput) => {
     await onCreateTrip(input);
     setActionNotice({
-      text: `Added past drive on ${formatDisplayDate(input.tripDate)} (${input.billableMiles.toFixed(1)} mi · ${formatCurrency(input.reimbursementAmount)}).`,
+      text: `${formatLocalizedDate(input.tripDate)} (${input.billableMiles.toFixed(1)} ${t('common.mi')} · ${formatCurrency(input.reimbursementAmount)})`,
     });
   };
 
   const handleUpdatePastDrive = async (trip: MileageTrip, patch: EditTripPatch) => {
     await onUpdateTrip(trip, patch);
     setActionNotice({
-      text: `Updated drive entry on ${formatDisplayDate(patch.tripDate)} (${patch.billableMiles.toFixed(1)} mi · ${formatCurrency(patch.reimbursementAmount)}).`,
+      text: `${formatLocalizedDate(patch.tripDate)} (${patch.billableMiles.toFixed(1)} ${t('common.mi')} · ${formatCurrency(patch.reimbursementAmount)})`,
     });
   };
 
@@ -547,18 +563,17 @@ export function TripLedgerView({
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-10 text-center max-w-lg mx-auto my-8 space-y-4">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          Sign in to view your Trip Ledger
+          {t('ledger.signInTitle')}
         </h2>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Your logged trips stay synced securely across your phone and computer so you can bundle
-          them into a Curacao mileage report whenever you are ready.
+          {t('ledger.signInDesc')}
         </p>
         <button
           type="button"
           onClick={onRequestSignIn}
           className="px-4 py-2.5 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg transition-colors whitespace-nowrap"
         >
-          Sign In with Google
+          {t('auth.signInGoogle')}
         </button>
       </div>
     );
@@ -569,44 +584,71 @@ export function TripLedgerView({
       {/* Summary Strip */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 dark:text-slate-400">Ready to Submit</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            {t('ledger.readyToSubmit')}
+          </div>
           <div className="mt-1 flex items-baseline justify-between gap-2">
-            <span className="text-xl font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100">
-              {readyTrips.reduce((s, t) => s + t.billableMiles, 0).toFixed(1)} mi
+            <span
+              className="text-xl font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100"
+              dir="ltr"
+            >
+              {readyTrips.reduce((s, trip) => s + trip.billableMiles, 0).toFixed(1)}{' '}
+              {t('common.mi')}
             </span>
-            <span className="text-sm font-semibold font-mono tabular-nums text-amber-700 dark:text-amber-400">
-              {formatCurrency(readyTrips.reduce((s, t) => s + t.reimbursementAmount, 0))}
+            <span
+              className="text-sm font-semibold font-mono tabular-nums text-amber-700 dark:text-amber-400"
+              dir="ltr"
+            >
+              {formatCurrency(readyTrips.reduce((s, trip) => s + trip.reimbursementAmount, 0))}
             </span>
           </div>
           <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {readyTrips.length} {readyTrips.length === 1 ? 'unsubmitted trip' : 'unsubmitted trips'}
+            {readyTrips.length}{' '}
+            {readyTrips.length === 1
+              ? t('ledger.unsubmittedSingle')
+              : t('ledger.unsubmittedPlural')}
           </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
-          <div className="text-xs text-slate-500 dark:text-slate-400">Filtered View Total</div>
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            {t('ledger.filteredTotal')}
+          </div>
           <div className="mt-1 flex items-baseline justify-between gap-2">
-            <span className="text-xl font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100">
-              {totalFilteredMiles.toFixed(1)} mi
+            <span
+              className="text-xl font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100"
+              dir="ltr"
+            >
+              {totalFilteredMiles.toFixed(1)} {t('common.mi')}
             </span>
-            <span className="text-sm font-semibold font-mono tabular-nums text-blue-800 dark:text-blue-400">
+            <span
+              className="text-sm font-semibold font-mono tabular-nums text-blue-800 dark:text-blue-400"
+              dir="ltr"
+            >
               {formatCurrency(totalFilteredAmount)}
             </span>
           </div>
           <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {filteredTrips.length} {filteredTrips.length === 1 ? 'trip shown' : 'trips shown'}
+            {filteredTrips.length}{' '}
+            {filteredTrips.length === 1 ? t('ledger.shownSingle') : t('ledger.shownPlural')}
           </div>
         </div>
 
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col justify-between gap-3">
           <div>
-            <div className="text-xs text-slate-500 dark:text-slate-400">Ready to Submit Report</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">
+              {t('ledger.readyReportTitle')}
+            </div>
             <p className="text-xs text-slate-600 dark:text-slate-400 mt-0.5">
               {chosenReadyTrips.length > 0
-                ? `Bundle ${chosenReadyTrips.length} ready ${
-                    chosenReadyTrips.length === 1 ? 'trip' : 'trips'
-                  } into a printable & CSV report.`
-                : 'Log a trip to start your next mileage report.'}
+                ? t('ledger.bundleHint', {
+                    count: chosenReadyTrips.length,
+                    unit:
+                      chosenReadyTrips.length === 1
+                        ? t('nav.tripSingular')
+                        : t('nav.tripPlural'),
+                  })
+                : t('ledger.logToStart')}
             </p>
           </div>
           <button
@@ -617,8 +659,8 @@ export function TripLedgerView({
           >
             <FileCheck2 className="w-4 h-4" />
             {isGenerating
-              ? 'Generating Report...'
-              : `Generate Report (${chosenReadyTrips.length})`}
+              ? t('ledger.generatingReport')
+              : t('header.generateReport', { count: chosenReadyTrips.length })}
           </button>
         </div>
       </div>
@@ -652,7 +694,7 @@ export function TripLedgerView({
                 onClick={() => onOpenReport(actionNotice.reportId!)}
                 className="font-semibold text-emerald-900 dark:text-emerald-200 underline hover:text-emerald-700 dark:hover:text-emerald-100 whitespace-nowrap"
               >
-                Open Report
+                {t('ledger.openReport')}
               </button>
             )}
             <button
@@ -660,7 +702,7 @@ export function TripLedgerView({
               onClick={() => setActionNotice(null)}
               className="text-emerald-700 dark:text-emerald-300 hover:text-emerald-900 dark:hover:text-emerald-100"
             >
-              Dismiss
+              {t('common.dismiss')}
             </button>
           </div>
         </div>
@@ -709,21 +751,21 @@ export function TripLedgerView({
           {/* Primary Search Row */}
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
             <div className="relative flex-1">
-              <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-4 h-4 text-slate-400 dark:text-slate-500 absolute start-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
-                aria-label="Search trips by destination, purpose, or date"
+                aria-label={t('ledger.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by destination name, purpose, or date (e.g. Panorama, Transfer, 2026-11-21)..."
-                className="w-full pl-9 pr-8 py-2 text-xs sm:text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                placeholder={t('ledger.searchPlaceholder')}
+                className="w-full ps-9 pe-8 py-2 text-xs sm:text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  aria-label="Clear search query"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
+                  aria-label={t('common.close')}
+                  className="absolute end-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -732,27 +774,27 @@ export function TripLedgerView({
 
             <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
               <select
-                aria-label="Filter by business purpose"
+                aria-label={t('ledger.colPurpose')}
                 value={purposeFilter}
                 onChange={(e) => setPurposeFilter(e.target.value as 'all' | TripPurpose)}
                 className="px-3 py-2 text-xs bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
               >
-                <option value="all">All Purposes</option>
+                <option value="all">{t('ledger.allPurposes')}</option>
                 {TRIP_PURPOSES.map((p) => (
                   <option key={p} value={p}>
-                    {p}
+                    {tPurpose(p)}
                   </option>
                 ))}
               </select>
 
               <div className="relative">
-                <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute start-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="date"
-                  aria-label="Filter by exact date"
+                  aria-label={t('ledger.colDate')}
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
-                  className="pl-8 pr-2.5 py-2 text-xs font-mono tabular-nums bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                  className="ps-8 pe-2.5 py-2 text-xs font-mono tabular-nums bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
                 />
               </div>
             </div>
@@ -764,10 +806,10 @@ export function TripLedgerView({
               <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
                 {(
                   [
-                    ['all', 'All Trips'],
-                    ['ready', 'Ready'],
-                    ['submitted', 'Submitted'],
-                    ['reimbursed', 'Reimbursed'],
+                    ['all', t('ledger.allTrips')],
+                    ['ready', tStage('ready')],
+                    ['submitted', tStage('submitted')],
+                    ['reimbursed', tStage('reimbursed')],
                   ] as const
                 ).map(([val, label]) => (
                   <button
@@ -786,16 +828,16 @@ export function TripLedgerView({
               </div>
 
               <div className="relative">
-                <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute start-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <select
-                  aria-label="Sort trips"
+                  aria-label={t('sort.date_desc')}
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as TripSortOption)}
-                  className="pl-8 pr-7 py-1.5 text-xs bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                  className="ps-8 pe-7 py-1.5 text-xs bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
                 >
                   {SORT_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
-                      {opt.label}
+                      {t(opt.labelKey)}
                     </option>
                   ))}
                 </select>
@@ -807,16 +849,16 @@ export function TripLedgerView({
                   onClick={clearAllFilters}
                   className="text-xs font-medium text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 whitespace-nowrap"
                 >
-                  Reset Filters
+                  {t('ledger.resetFilters')}
                 </button>
               )}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
               {filteredTrips.length > 0 && !inspectedTrip && (
-                <span className="hidden xl:inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 mr-1">
+                <span className="hidden xl:inline-flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 me-1">
                   <MapPin className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                  Click any trip to preview route &amp; PDF receipt
+                  {t('ledger.clickPreviewHint')}
                 </span>
               )}
               <button
@@ -825,7 +867,7 @@ export function TripLedgerView({
                 className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg transition-colors whitespace-nowrap shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Add Past Drive
+                {t('ledger.addPastDrive')}
               </button>
               <button
                 type="button"
@@ -833,23 +875,18 @@ export function TripLedgerView({
                 className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-blue-800 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/80 hover:bg-blue-100 dark:hover:bg-blue-900/60 rounded-lg transition-colors whitespace-nowrap shrink-0"
               >
                 <MapIcon className="w-3.5 h-3.5" />
-                Map View
+                {t('ledger.mapView')}
               </button>
               <button
                 type="button"
                 disabled={selectedTrips.length === 0}
                 onClick={handleExportSelectedCsv}
-                title={
-                  selectedTrips.length === 0
-                    ? 'Select one or more trips to export to CSV'
-                    : `Export ${selectedTrips.length} selected trips to CSV`
-                }
                 className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-45 disabled:cursor-not-allowed rounded-lg transition-colors whitespace-nowrap shrink-0"
               >
                 <Download className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
                 {selectedTrips.length > 0
-                  ? `Export Selected CSV (${selectedTrips.length})`
-                  : 'Export Selected CSV'}
+                  ? t('ledger.exportCsvCount', { count: selectedTrips.length })
+                  : t('ledger.exportCsv')}
               </button>
             </div>
           </div>
@@ -864,14 +901,20 @@ export function TripLedgerView({
           >
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-800 dark:text-slate-200">
               <span className="font-semibold font-mono tabular-nums text-blue-950 dark:text-blue-200">
-                {selectedTrips.length} {selectedTrips.length === 1 ? 'trip' : 'trips'} selected
+                {t('ledger.selectedCount', {
+                  count: selectedTrips.length,
+                  unit:
+                    selectedTrips.length === 1 ? t('nav.tripSingular') : t('nav.tripPlural'),
+                })}
               </span>
               <span aria-hidden="true" className="text-blue-300 dark:text-blue-700">
                 ·
               </span>
               <span className="text-slate-600 dark:text-slate-400 font-mono tabular-nums">
-                {selectedReadyTrips.length} ready
-                {selectedSubmittedCount > 0 ? ` · ${selectedSubmittedCount} locked` : ''}
+                {selectedReadyTrips.length} {tStage('ready').toLowerCase()}
+                {selectedSubmittedCount > 0
+                  ? ` · ${selectedSubmittedCount} ${t('common.locked').toLowerCase()}`
+                  : ''}
               </span>
               <span aria-hidden="true" className="text-blue-300 dark:text-blue-700">
                 ·
@@ -881,7 +924,7 @@ export function TripLedgerView({
                 onClick={clearSelection}
                 className="font-medium text-blue-800 dark:text-blue-300 hover:text-blue-950 dark:hover:text-blue-200 underline whitespace-nowrap"
               >
-                Clear selection
+                {t('ledger.clearSelection')}
               </button>
             </div>
 
@@ -889,17 +932,17 @@ export function TripLedgerView({
               {/* Batch Assign to Specific Report */}
               <div className="flex items-center gap-1.5">
                 <select
-                  aria-label="Choose target report for selected trips"
+                  aria-label={t('ledger.createNewReport')}
                   value={assignTargetId}
                   onChange={(e) => setAssignTargetId(e.target.value)}
                   disabled={selectedReadyTrips.length === 0 || isBatchBusy}
                   className="px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-800 rounded-lg text-slate-800 dark:text-slate-200 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
                 >
-                  <option value="__new__">Create New Report</option>
+                  <option value="__new__">{t('ledger.createNewReport')}</option>
                   {assignableReports.map((rep) => (
                     <option key={rep.id} value={rep.id}>
                       {rep.reportNumber} ({rep.tripCount}{' '}
-                      {rep.tripCount === 1 ? 'trip' : 'trips'})
+                      {rep.tripCount === 1 ? t('nav.tripSingular') : t('nav.tripPlural')})
                     </option>
                   ))}
                 </select>
@@ -911,8 +954,8 @@ export function TripLedgerView({
                 >
                   <FolderInput className="w-3.5 h-3.5" />
                   {isBatchBusy
-                    ? 'Assigning...'
-                    : `Assign to Report (${selectedReadyTrips.length})`}
+                    ? t('ledger.assigning')
+                    : t('ledger.assignToReport', { count: selectedReadyTrips.length })}
                 </button>
               </div>
 
@@ -922,15 +965,10 @@ export function TripLedgerView({
                   type="button"
                   disabled={selectedReadyTrips.length === 0 || isBatchBusy}
                   onClick={() => setConfirmBatchDelete(true)}
-                  title={
-                    selectedReadyTrips.length === 0
-                      ? 'Only unsubmitted trips can be deleted'
-                      : `Delete ${selectedReadyTrips.length} selected ready trips`
-                  }
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 bg-white dark:bg-slate-900 border border-red-200 dark:border-red-900/70 hover:bg-red-50 dark:hover:bg-red-950/50 disabled:opacity-45 disabled:cursor-not-allowed rounded-lg transition-colors whitespace-nowrap shrink-0"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  Delete ({selectedReadyTrips.length})
+                  {t('common.delete')} ({selectedReadyTrips.length})
                 </button>
               ) : (
                 <div className="inline-flex items-center gap-1.5">
@@ -941,8 +979,8 @@ export function TripLedgerView({
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap shrink-0"
                   >
                     {isBatchBusy
-                      ? 'Deleting...'
-                      : `Confirm Delete (${selectedReadyTrips.length})`}
+                      ? t('common.deleting')
+                      : t('ledger.confirmDeleteCount', { count: selectedReadyTrips.length })}
                   </button>
                   <button
                     type="button"
@@ -950,7 +988,7 @@ export function TripLedgerView({
                     onClick={() => setConfirmBatchDelete(false)}
                     className="px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg whitespace-nowrap shrink-0"
                   >
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                 </div>
               )}
@@ -967,14 +1005,10 @@ export function TripLedgerView({
         ) : filteredTrips.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-              {trips.length === 0
-                ? 'No mileage trips logged yet'
-                : 'No trips match your current search or filters'}
+              {trips.length === 0 ? t('ledger.noTripsTitle') : t('ledger.noTripsMatch')}
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-              {trips.length === 0
-                ? 'Pick any two Curacao LA stores or addresses in Log Trip to calculate driving miles automatically.'
-                : 'Try clearing your search query, date filter, or switching the status tab.'}
+              {trips.length === 0 ? t('ledger.noTripsDesc') : t('ledger.noTripsMatchDesc')}
             </p>
             {trips.length === 0 ? (
               <div className="flex flex-wrap items-center justify-center gap-2">
@@ -984,14 +1018,14 @@ export function TripLedgerView({
                   className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg transition-colors whitespace-nowrap"
                 >
                   <Plus className="w-4 h-4" />
-                  Add Past Drive
+                  {t('ledger.addPastDrive')}
                 </button>
                 <button
                   type="button"
                   onClick={onGoToLogger}
                   className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap"
                 >
-                  Open Live Trip Logger
+                  {t('ledger.openLogger')}
                 </button>
               </div>
             ) : (
@@ -1000,16 +1034,16 @@ export function TripLedgerView({
                 onClick={clearAllFilters}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap"
               >
-                Clear All Filters
+                {t('ledger.clearAllFilters')}
               </button>
             )}
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-start border-collapse">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 text-xs font-medium text-slate-500 dark:text-slate-400">
-                  <th className="py-2.5 pl-4 pr-2 w-10">
+                  <th className="py-2.5 ps-4 pe-2 w-10">
                     <button
                       type="button"
                       onClick={toggleSelectAllFiltered}
@@ -1027,13 +1061,17 @@ export function TripLedgerView({
                       )}
                     </button>
                   </th>
-                  <th className="py-2.5 px-3 whitespace-nowrap">Date</th>
-                  <th className="py-2.5 px-3">Route</th>
-                  <th className="py-2.5 px-3 whitespace-nowrap">Purpose</th>
-                  <th className="py-2.5 px-3 text-right whitespace-nowrap">Miles</th>
-                  <th className="py-2.5 px-3 text-right whitespace-nowrap">Amount</th>
-                  <th className="py-2.5 px-3 whitespace-nowrap">Status</th>
-                  <th className="py-2.5 pl-3 pr-4 text-right whitespace-nowrap">Actions</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.colDate')}</th>
+                  <th className="py-2.5 px-3">{t('ledger.colRoute')}</th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.colPurpose')}</th>
+                  <th className="py-2.5 px-3 text-end whitespace-nowrap">{t('ledger.colMiles')}</th>
+                  <th className="py-2.5 px-3 text-end whitespace-nowrap">
+                    {t('ledger.colAmount')}
+                  </th>
+                  <th className="py-2.5 px-3 whitespace-nowrap">{t('ledger.colStatus')}</th>
+                  <th className="py-2.5 ps-3 pe-4 text-end whitespace-nowrap">
+                    {t('ledger.colActions')}
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
@@ -1059,7 +1097,7 @@ export function TripLedgerView({
                       }`}
                     >
                       <td
-                        className="py-3 pl-4 pr-2 align-middle"
+                        className="py-3 ps-4 pe-2 align-middle"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
@@ -1076,7 +1114,7 @@ export function TripLedgerView({
                         </button>
                       </td>
                       <td className="py-3 px-3 font-mono tabular-nums text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                        {formatDisplayDate(trip.tripDate)}
+                        {formatLocalizedDate(trip.tripDate)}
                       </td>
                       <td className="py-3 px-3 min-w-[240px]">
                         <button
@@ -1085,7 +1123,7 @@ export function TripLedgerView({
                             e.stopPropagation();
                             handleInspectTrip(trip.id);
                           }}
-                          className="text-left block w-full focus:outline-none focus-visible:underline"
+                          className="text-start block w-full focus:outline-none focus-visible:underline"
                         >
                           <div className="flex items-center gap-1.5 font-medium text-slate-900 dark:text-slate-100 text-xs sm:text-sm">
                             <span className="truncate">
@@ -1101,22 +1139,28 @@ export function TripLedgerView({
                             />
                           </div>
                           <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate max-w-md">
-                            {isInspected ? 'Showing route & details · ' : ''}
-                            {trip.isRoundTrip ? 'Round Trip' : 'One-Way'}
+                            {isInspected ? t('ledger.showingRoute') : ''}
+                            {trip.isRoundTrip ? t('common.roundTrip') : t('common.oneWay')}
                             {trip.commuteDeductionMiles > 0
-                              ? ` · −${trip.commuteDeductionMiles.toFixed(1)} mi commute`
+                              ? ` · −${trip.commuteDeductionMiles.toFixed(1)} ${t('common.mi')}`
                               : ''}
                             {trip.notes ? ` · ${trip.notes}` : ''}
                           </div>
                         </button>
                       </td>
                       <td className="py-3 px-3 text-xs text-slate-700 dark:text-slate-300 whitespace-nowrap">
-                        {trip.purpose}
+                        {tPurpose(trip.purpose)}
                       </td>
-                      <td className="py-3 px-3 text-right font-mono tabular-nums text-xs font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                        {trip.billableMiles.toFixed(1)} mi
+                      <td
+                        className="py-3 px-3 text-end font-mono tabular-nums text-xs font-medium text-slate-900 dark:text-slate-100 whitespace-nowrap"
+                        dir="ltr"
+                      >
+                        {trip.billableMiles.toFixed(1)} {t('common.mi')}
                       </td>
-                      <td className="py-3 px-3 text-right font-mono tabular-nums text-xs font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                      <td
+                        className="py-3 px-3 text-end font-mono tabular-nums text-xs font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap"
+                        dir="ltr"
+                      >
                         <div>{formatCurrency(trip.reimbursementAmount)}</div>
                         {(expensesByTripId[trip.id]?.length ?? 0) > 0 && (
                           <div className="text-[11px] font-medium text-blue-700 dark:text-blue-400">
@@ -1124,7 +1168,7 @@ export function TripLedgerView({
                             {formatCurrency(
                               expensesByTripId[trip.id].reduce((sum, e) => sum + e.amount, 0)
                             )}{' '}
-                            exp
+                            {t('nav.expShort')}
                           </div>
                         )}
                       </td>
@@ -1139,14 +1183,14 @@ export function TripLedgerView({
                             className={`inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold rounded-md border whitespace-nowrap ${badge.className}`}
                           >
                             <StageIcon className="w-3 h-3 shrink-0" aria-hidden="true" />
-                            {badge.label}
+                            {tStage(stage)}
                           </span>
                           {!isReady && reportRef && (
                             <button
                               type="button"
                               onClick={() => onOpenReport(trip.reportId)}
                               className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-blue-700 dark:hover:text-blue-400 hover:underline font-mono tabular-nums"
-                              title={`Open report ${reportRef}`}
+                              title={`${t('ledger.openReport')} ${reportRef}`}
                             >
                               {reportRef}
                             </button>
@@ -1154,7 +1198,7 @@ export function TripLedgerView({
                         </div>
                       </td>
                       <td
-                        className="py-3 pl-3 pr-4 text-right whitespace-nowrap"
+                        className="py-3 ps-3 pe-4 text-end whitespace-nowrap"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {isReady ? (
@@ -1166,7 +1210,9 @@ export function TripLedgerView({
                                 onClick={() => void handleSingleDeleteTrip(trip.id)}
                                 className="px-2 py-1 text-[11px] font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 rounded transition-colors whitespace-nowrap"
                               >
-                                {deletingRowId === trip.id ? 'Deleting...' : 'Delete'}
+                                {deletingRowId === trip.id
+                                  ? t('common.deleting')
+                                  : t('common.delete')}
                               </button>
                               <button
                                 type="button"
@@ -1174,7 +1220,7 @@ export function TripLedgerView({
                                 onClick={() => setConfirmDeleteRowId(null)}
                                 className="px-2 py-1 text-[11px] font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded transition-colors whitespace-nowrap"
                               >
-                                Cancel
+                                {t('common.cancel')}
                               </button>
                             </div>
                           ) : (
@@ -1182,8 +1228,8 @@ export function TripLedgerView({
                               <button
                                 type="button"
                                 onClick={() => openEditPastDrive(trip)}
-                                title="Edit drive entry"
-                                aria-label="Edit trip"
+                                title={t('common.edit')}
+                                aria-label={t('common.edit')}
                                 className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-blue-700 dark:hover:text-blue-400 rounded transition-colors"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
@@ -1191,8 +1237,8 @@ export function TripLedgerView({
                               <button
                                 type="button"
                                 onClick={() => openDuplicatePastDrive(trip)}
-                                title="Duplicate drive as new past entry"
-                                aria-label="Duplicate trip"
+                                title={t('common.duplicate')}
+                                aria-label={t('common.duplicate')}
                                 className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-blue-700 dark:hover:text-blue-400 rounded transition-colors"
                               >
                                 <Copy className="w-3.5 h-3.5" />
@@ -1200,8 +1246,8 @@ export function TripLedgerView({
                               <button
                                 type="button"
                                 onClick={() => setConfirmDeleteRowId(trip.id)}
-                                title="Delete drive entry"
-                                aria-label="Delete trip"
+                                title={t('common.delete')}
+                                aria-label={t('common.delete')}
                                 className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -1213,13 +1259,15 @@ export function TripLedgerView({
                             <button
                               type="button"
                               onClick={() => openDuplicatePastDrive(trip)}
-                              title="Duplicate submitted drive as a new past entry"
-                              aria-label="Duplicate trip"
+                              title={t('common.duplicate')}
+                              aria-label={t('common.duplicate')}
                               className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-blue-700 dark:hover:text-blue-400 rounded transition-colors"
                             >
                               <Copy className="w-3.5 h-3.5" />
                             </button>
-                            <span className="text-xs text-slate-400 dark:text-slate-500">Locked</span>
+                            <span className="text-xs text-slate-400 dark:text-slate-500">
+                              {t('common.locked')}
+                            </span>
                           </div>
                         )}
                       </td>

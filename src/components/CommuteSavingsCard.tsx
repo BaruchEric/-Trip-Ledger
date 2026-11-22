@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Calculator, RotateCcw } from 'lucide-react';
+import { useI18n } from '../lib/i18n';
 import {
   DEFAULT_RATE_PER_MILE,
   formatCurrency,
@@ -74,6 +75,7 @@ function estimateWeeklyBusinessMilesFromTrips(trips: MileageTrip[]): {
 }
 
 export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCardProps) {
+  const { t } = useI18n();
   const storeNetworkAvgCommute = useMemo(
     () => computeAverageCuracaoStoreSpacing(stores),
     [stores]
@@ -204,12 +206,11 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
           <div className="flex items-center gap-2">
             <Calculator className="w-4 h-4 text-blue-700 dark:text-blue-400 shrink-0" />
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Commute Savings Calculator
+              {t('calc.title')}
             </h2>
           </div>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Estimate annual mileage reimbursement and commute fuel offset comparing your average
-            Curacao store commute against reimbursable business miles.
+            {t('calc.subtitle')}
           </p>
         </div>
 
@@ -219,7 +220,7 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
           className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap shrink-0"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          Reset to My Data
+          {t('calc.resetData')}
         </button>
       </div>
 
@@ -234,10 +235,10 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
                 htmlFor="calc-commute-mi"
                 className="text-xs font-medium text-slate-700 dark:text-slate-300"
               >
-                Avg. Curacao Store Commute (one-way)
+                {t('calc.avgCommute')}
               </label>
               <span className="text-xs font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100">
-                {commuteOneWayMiles.toFixed(1)} mi
+                {commuteOneWayMiles.toFixed(1)} {t('common.mi')}
               </span>
             </div>
             <div className="flex items-center gap-3">
@@ -279,10 +280,10 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
                 htmlFor="calc-biz-mi"
                 className="text-xs font-medium text-slate-700 dark:text-slate-300"
               >
-                Reimbursable Business Miles / Week
+                {t('calc.bizMilesWeek')}
               </label>
               <span className="text-xs font-mono tabular-nums font-semibold text-blue-800 dark:text-blue-400">
-                {weeklyBusinessMiles.toFixed(1)} mi/wk
+                {weeklyBusinessMiles.toFixed(1)} {t('common.mi')}
               </span>
             </div>
             <div className="flex items-center gap-3">
@@ -291,7 +292,7 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
                 min="0"
                 max="200"
                 step="1"
-                aria-label="Weekly reimbursable business miles slider"
+                aria-label={t('calc.bizMilesWeek')}
                 value={Math.min(200, weeklyBusinessMiles)}
                 onChange={(e) => {
                   setWeeklyBusinessMiles(parseFloat(e.target.value) || 0);
@@ -302,6 +303,7 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
               <input
                 id="calc-biz-mi"
                 type="number"
+                dir="ltr"
                 min="0"
                 max="1000"
                 step="1"
@@ -322,7 +324,7 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
           {/* Shifts per Week Segmented Control */}
           <div className="space-y-1.5">
             <span className="block text-xs font-medium text-slate-700 dark:text-slate-300">
-              Retail Shifts / Week
+              {t('calc.shiftsWeek')}
             </span>
             <div className="grid grid-cols-4 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
               {[3, 4, 5, 6].map((cnt) => (
@@ -339,7 +341,7 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
                       : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                   }`}
                 >
-                  {cnt} days
+                  {t('calc.days', { count: cnt })}
                 </button>
               ))}
             </div>
@@ -352,11 +354,12 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
                 htmlFor="calc-rate"
                 className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1"
               >
-                Reimb. Rate
+                {t('calc.reimbRate')}
               </label>
               <input
                 id="calc-rate"
                 type="number"
+                dir="ltr"
                 min="0.01"
                 max="5"
                 step="0.01"
@@ -374,11 +377,12 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
                 htmlFor="calc-opcost"
                 className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1"
               >
-                Fuel/Wear $/mi
+                {t('calc.fuelWear')}
               </label>
               <input
                 id="calc-opcost"
                 type="number"
+                dir="ltr"
                 min="0"
                 max="3"
                 step="0.01"
@@ -396,11 +400,12 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
                 htmlFor="calc-weeks"
                 className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1"
               >
-                Weeks / Year
+                {t('calc.weeksYear')}
               </label>
               <input
                 id="calc-weeks"
                 type="number"
+                dir="ltr"
                 min="1"
                 max="52"
                 step="1"
@@ -422,19 +427,22 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
             <div>
               <div className="text-xs text-slate-500 dark:text-slate-400">
-                Est. Annual Reimbursement
+                {t('calc.estAnnualReimb')}
               </div>
-              <div className="text-2xl font-bold font-mono tabular-nums text-blue-800 dark:text-blue-400 mt-1">
+              <div dir="ltr" className="text-2xl font-bold font-mono tabular-nums text-blue-800 dark:text-blue-400 mt-1">
                 {formatCurrency(metrics.annualReimbursement)}
               </div>
               <div className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400 mt-0.5">
-                {formatCurrency(metrics.monthlyReimbursement)} / mo avg
+                {t('calc.moAvg', { amount: formatCurrency(metrics.monthlyReimbursement) })}
               </div>
             </div>
 
             <div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">Net Annual Savings</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                {t('calc.netAnnualSavings')}
+              </div>
               <div
+                dir="ltr"
                 className={`text-2xl font-bold font-mono tabular-nums mt-1 ${
                   metrics.netAnnualSavings >= 0
                     ? 'text-emerald-700 dark:text-emerald-400'
@@ -444,19 +452,21 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
                 {formatCurrency(metrics.netAnnualSavings)}
               </div>
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                After ${operatingCostPerMile.toFixed(2)}/mi business fuel
+                {t('calc.afterBizFuel', { cost: operatingCostPerMile.toFixed(2) })}
               </div>
             </div>
 
             <div>
-              <div className="text-xs text-slate-500 dark:text-slate-400">Commute Fuel Offset</div>
-              <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100 mt-1">
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                {t('calc.commuteOffset')}
+              </div>
+              <div dir="ltr" className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100 mt-1">
                 {metrics.commuteOffsetPct}%
               </div>
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 font-mono tabular-nums">
                 {metrics.annualCommuteFuelCost > 0
-                  ? `${formatCurrency(metrics.effectiveCommuteCost)} net commute/yr`
-                  : 'Zero daily commute'}
+                  ? t('calc.netCommuteYr', { amount: formatCurrency(metrics.effectiveCommuteCost) })
+                  : t('calc.zeroCommute')}
               </div>
             </div>
           </div>
@@ -465,10 +475,13 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
           <div className="space-y-2.5">
             <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs">
               <span className="font-semibold text-slate-900 dark:text-slate-100">
-                Annual Work Driving Breakdown ({metrics.totalAnnualWorkMiles.toLocaleString()} mi/yr)
+                {t('calc.breakdownTitle', { miles: metrics.totalAnnualWorkMiles.toLocaleString() })}
               </span>
               <span className="font-mono tabular-nums text-slate-600 dark:text-slate-400">
-                {metrics.reimbursableSharePct}% reimbursable · {metrics.commuteSharePct}% commute
+                {t('calc.breakdownSplit', {
+                  reimb: metrics.reimbursableSharePct,
+                  commute: metrics.commuteSharePct,
+                })}
               </span>
             </div>
 
@@ -476,50 +489,48 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
               <div
                 className="h-full bg-blue-700 dark:bg-blue-500 transition-all duration-200"
                 style={{ width: `${metrics.reimbursableSharePct}%` }}
-                title={`Reimbursable business miles: ${metrics.annualBusinessMiles.toLocaleString()} mi/yr`}
               />
               <div
                 className="h-full bg-slate-300 dark:bg-slate-600 transition-all duration-200"
                 style={{ width: `${metrics.commuteSharePct}%` }}
-                title={`Store commute miles: ${metrics.annualCommuteMiles.toLocaleString()} mi/yr`}
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 text-xs">
-              <div className="flex items-start justify-between gap-2 py-2 border-b sm:border-b-0 sm:border-r border-slate-100 dark:border-slate-800 sm:pr-3">
+              <div className="flex items-start justify-between gap-2 py-2 border-b sm:border-b-0 sm:border-e border-slate-100 dark:border-slate-800 sm:pe-3">
                 <div className="space-y-0.5">
                   <div className="font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                     <span
                       className="w-2.5 h-2.5 rounded-sm bg-blue-700 dark:bg-blue-500 shrink-0"
                       aria-hidden="true"
                     />
-                    Reimbursable Business Miles
+                    {t('calc.reimbBizMiles')}
                   </div>
                   <div className="text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                    {metrics.annualBusinessMiles.toLocaleString()} mi/yr · Fuel{' '}
+                    {metrics.annualBusinessMiles.toLocaleString()} {t('common.mi')} ·{' '}
                     {formatCurrency(metrics.annualBusinessFuelCost)}
                   </div>
                 </div>
-                <span className="font-mono tabular-nums font-semibold text-blue-800 dark:text-blue-400 whitespace-nowrap">
+                <span dir="ltr" className="font-mono tabular-nums font-semibold text-blue-800 dark:text-blue-400 whitespace-nowrap">
                   +{formatCurrency(metrics.annualReimbursement)}
                 </span>
               </div>
 
-              <div className="flex items-start justify-between gap-2 py-2 sm:pl-1">
+              <div className="flex items-start justify-between gap-2 py-2 sm:ps-1">
                 <div className="space-y-0.5">
                   <div className="font-medium text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
                     <span
                       className="w-2.5 h-2.5 rounded-sm bg-slate-300 dark:bg-slate-600 shrink-0"
                       aria-hidden="true"
                     />
-                    Regular Store Commute
+                    {t('calc.regularCommute')}
                   </div>
                   <div className="text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                    {metrics.annualCommuteMiles.toLocaleString()} mi/yr ({commuteOneWayMiles.toFixed(1)}{' '}
-                    mi × 2 × {shiftsPerWeek}d)
+                    {metrics.annualCommuteMiles.toLocaleString()} {t('common.mi')} ({commuteOneWayMiles.toFixed(1)}{' '}
+                    × 2 × {shiftsPerWeek})
                   </div>
                 </div>
-                <span className="font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                <span dir="ltr" className="font-mono tabular-nums font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap">
                   −{formatCurrency(metrics.annualCommuteFuelCost)}
                 </span>
               </div>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Check, Save } from 'lucide-react';
+import { useI18n } from '../lib/i18n';
 import {
   DEFAULT_RATE_PER_MILE,
   FIELD_LIMITS,
@@ -45,6 +46,7 @@ export function ProfileSettingsView({
   storesLoading,
   onSaveProfile,
 }: ProfileSettingsViewProps) {
+  const { t } = useI18n();
   const [employeeName, setEmployeeName] = useState(profile?.employeeName ?? userDisplayName);
   const [employeeId, setEmployeeId] = useState(profile?.employeeId ?? '');
   const [department, setDepartment] = useState(profile?.department ?? 'Retail Operations');
@@ -118,12 +120,12 @@ export function ProfileSettingsView({
       });
       setStatus({
         type: 'success',
-        text: 'Employee profile and automation defaults saved.',
+        text: t('settings.savedSuccess'),
       });
     } catch {
       setStatus({
         type: 'error',
-        text: 'Could not save settings. Please verify your inputs and try again.',
+        text: t('settings.savedError'),
       });
     } finally {
       setIsSaving(false);
@@ -134,18 +136,17 @@ export function ProfileSettingsView({
     return (
       <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-10 text-center max-w-lg mx-auto my-8 space-y-4">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          Sign in to save your Employee Profile
+          {t('settings.signInTitle')}
         </h2>
         <p className="text-sm text-slate-600 dark:text-slate-400">
-          Save your home Curacao store, employee ID, reimbursement rate, and normal commute once so
-          every future mileage report fills in automatically.
+          {t('settings.signInDesc')}
         </p>
         <button
           type="button"
           onClick={onRequestSignIn}
           className="px-4 py-2.5 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg transition-colors whitespace-nowrap"
         >
-          Sign In with Google
+          {t('auth.signInGoogle')}
         </button>
       </div>
     );
@@ -161,10 +162,10 @@ export function ProfileSettingsView({
         <div className="p-6 space-y-4">
           <div>
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              Curacao Employee Details
+              {t('settings.empDetails')}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Printed automatically at the top of every mileage reimbursement report and CSV export.
+              {t('settings.empDetailsDesc')}
             </p>
           </div>
 
@@ -174,7 +175,7 @@ export function ProfileSettingsView({
                 htmlFor="prof-name"
                 className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
               >
-                Full Name
+                {t('settings.fullName')}
               </label>
               <input
                 id="prof-name"
@@ -182,7 +183,7 @@ export function ProfileSettingsView({
                 maxLength={FIELD_LIMITS.employeeName}
                 value={employeeName}
                 onChange={(e) => setEmployeeName(e.target.value)}
-                placeholder="Your full name"
+                placeholder={t('settings.fullNamePlaceholder')}
                 className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
               />
             </div>
@@ -192,7 +193,7 @@ export function ProfileSettingsView({
                 htmlFor="prof-id"
                 className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
               >
-                Employee ID
+                {t('settings.empId')}
               </label>
               <input
                 id="prof-id"
@@ -200,7 +201,7 @@ export function ProfileSettingsView({
                 maxLength={FIELD_LIMITS.employeeId}
                 value={employeeId}
                 onChange={(e) => setEmployeeId(e.target.value)}
-                placeholder="e.g., CUR-10482"
+                placeholder="CUR-10482"
                 className="w-full px-3 py-2 text-sm font-mono bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
               />
             </div>
@@ -210,7 +211,7 @@ export function ProfileSettingsView({
                 htmlFor="prof-dept"
                 className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
               >
-                Department / Role
+                {t('settings.deptRole')}
               </label>
               <input
                 id="prof-dept"
@@ -218,7 +219,7 @@ export function ProfileSettingsView({
                 maxLength={FIELD_LIMITS.department}
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                placeholder="e.g., Retail Sales, Merchandising, Operations"
+                placeholder={t('settings.deptPlaceholder')}
                 className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
               />
             </div>
@@ -228,11 +229,12 @@ export function ProfileSettingsView({
                 htmlFor="prof-manager"
                 className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
               >
-                Manager / Payroll Email
+                {t('settings.managerEmail')}
               </label>
               <input
                 id="prof-manager"
                 type="email"
+                dir="ltr"
                 maxLength={FIELD_LIMITS.managerEmail}
                 value={managerEmail}
                 onChange={(e) => setManagerEmail(e.target.value)}
@@ -247,11 +249,10 @@ export function ProfileSettingsView({
         <div className="p-6 space-y-4">
           <div>
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              Home Store &amp; Vehicle
+              {t('settings.homeStoreVehicle')}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Selecting your primary Curacao LA branch pre-fills Origin automatically when logging
-              trips.
+              {t('settings.homeStoreVehicleDesc')}
             </p>
           </div>
 
@@ -261,7 +262,7 @@ export function ProfileSettingsView({
                 htmlFor="prof-store"
                 className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
               >
-                Primary Curacao Store
+                {t('settings.primaryStore')}
               </label>
               <select
                 id="prof-store"
@@ -270,9 +271,7 @@ export function ProfileSettingsView({
                 className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
               >
                 <option value="">
-                  {storesLoading
-                    ? 'Loading Curacao LA locations...'
-                    : 'Select your home Curacao store'}
+                  {storesLoading ? t('settings.loadingStores') : t('settings.selectHomeStore')}
                 </option>
                 {stores.map((s) => (
                   <option key={s.placeId} value={s.placeId}>
@@ -292,7 +291,7 @@ export function ProfileSettingsView({
                 htmlFor="prof-vehicle"
                 className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
               >
-                Personal Vehicle
+                {t('settings.personalVehicle')}
               </label>
               <input
                 id="prof-vehicle"
@@ -300,7 +299,7 @@ export function ProfileSettingsView({
                 maxLength={FIELD_LIMITS.vehicleInfo}
                 value={vehicleInfo}
                 onChange={(e) => setVehicleInfo(e.target.value)}
-                placeholder="e.g., 2021 Toyota Corolla"
+                placeholder="2021 Toyota Corolla"
                 className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
               />
             </div>
@@ -311,10 +310,10 @@ export function ProfileSettingsView({
         <div className="p-6 space-y-4">
           <div>
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
-              Reimbursement Rate &amp; Commute Rule
+              {t('settings.rateCommuteTitle')}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Adjust your per-mile rate to match Curacao HR / IRS standard business mileage policy.
+              {t('settings.rateCommuteDesc')}
             </p>
           </div>
 
@@ -324,11 +323,12 @@ export function ProfileSettingsView({
                 htmlFor="prof-rate"
                 className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
               >
-                Reimbursement Rate ($ per mile)
+                {t('settings.rateLabel')}
               </label>
               <input
                 id="prof-rate"
                 type="number"
+                dir="ltr"
                 min="0.01"
                 max="5"
                 step="0.005"
@@ -342,6 +342,7 @@ export function ProfileSettingsView({
                   <button
                     key={preset.value}
                     type="button"
+                    dir="ltr"
                     onClick={() => setRatePerMile(preset.value)}
                     className={`px-2.5 py-1 text-xs font-mono rounded-md border transition-colors whitespace-nowrap ${
                       Math.abs(ratePerMile - preset.value) < 0.001
@@ -360,11 +361,12 @@ export function ProfileSettingsView({
                 htmlFor="prof-commute"
                 className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
               >
-                Normal One-Way Commute (miles)
+                {t('settings.commuteLabel')}
               </label>
               <input
                 id="prof-commute"
                 type="number"
+                dir="ltr"
                 min="0"
                 max="200"
                 step="0.1"
@@ -373,8 +375,7 @@ export function ProfileSettingsView({
                 className="w-full px-3 py-2 text-sm font-mono tabular-nums bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
               />
               <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
-                Optional. Enables a 1-click deduction when driving from home to cover a shift at a
-                non-home Curacao store.
+                {t('settings.commuteDesc')}
               </p>
             </div>
           </div>
@@ -403,7 +404,7 @@ export function ProfileSettingsView({
             className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap"
           >
             <Save className="w-4 h-4" />
-            {isSaving ? 'Saving...' : 'Save Settings'}
+            {isSaving ? t('common.saving') : t('settings.saveSettings')}
           </button>
         </div>
       </form>

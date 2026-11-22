@@ -21,6 +21,7 @@ import {
   THRESHOLD_PRESETS,
 } from '../lib/dailyMileageThreshold';
 import { suggestTripPurpose } from '../lib/purposeSuggestion';
+import { useI18n } from '../lib/i18n';
 import {
   calculateBillableMiles,
   calculateReimbursement,
@@ -28,7 +29,6 @@ import {
   FIELD_LIMITS,
   formatCurrency,
   formatDateISO,
-  formatDisplayDate,
   round1,
   TRIP_PURPOSES,
   type CaptureMethod,
@@ -131,6 +131,7 @@ export function TripLoggerView({
   onDeleteExpense,
   isDark = false,
 }: TripLoggerViewProps) {
+  const { t, tPurpose, tExpenseCategory, formatLocalizedDate } = useI18n();
   const [tripDate, setTripDate] = useState(formatDateISO());
   const [origin, setOrigin] = useState<PlaceSelection | null>(null);
   const [destination, setDestination] = useState<PlaceSelection | null>(null);
@@ -664,17 +665,19 @@ export function TripLoggerView({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Non-Mileage Travel Expenses
+                {t('logger.nonMileageTitle')}
               </h2>
               {readyExpenses.length > 0 && (
                 <span className="text-xs font-mono tabular-nums font-semibold text-blue-800 dark:text-blue-300">
-                  {formatCurrency(readyExpensesTotal)} queued ({readyExpenses.length})
+                  {t('logger.queuedAmount', {
+                    amount: formatCurrency(readyExpensesTotal),
+                    count: readyExpenses.length,
+                  })}
                 </span>
               )}
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Log parking, FasTrak express lanes, or tolls — totals are automatically included in
-              your PDF reimbursement reports.
+              {t('logger.nonMileageDesc')}
             </p>
           </div>
         </div>
@@ -684,7 +687,7 @@ export function TripLoggerView({
           className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg transition-colors whitespace-nowrap shrink-0"
         >
           <Receipt className="w-3.5 h-3.5" />
-          Quick Expense
+          {t('logger.quickExpense')}
         </button>
       </section>
 
@@ -694,10 +697,10 @@ export function TripLoggerView({
           <div className="flex items-center justify-between gap-4 mb-3">
             <div>
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Frequent Routes
+                {t('logger.frequentRoutes')}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Click a saved route to preview on the map, or use Log Today for 1-click entry.
+                {t('logger.frequentRoutesDesc')}
               </p>
             </div>
           </div>
@@ -712,14 +715,15 @@ export function TripLoggerView({
                   <button
                     type="button"
                     onClick={() => handleApplyTemplate(tpl)}
-                    className="min-w-0 flex-1 text-left"
+                    className="min-w-0 flex-1 text-start"
                   >
                     <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
                       {tpl.label}
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums mt-0.5 truncate">
-                      {tplMiles.toFixed(1)} mi · {tpl.isRoundTrip ? 'Round Trip' : 'One-Way'} ·{' '}
-                      {tpl.purpose}
+                      {tplMiles.toFixed(1)} {t('common.mi')} ·{' '}
+                      {tpl.isRoundTrip ? t('common.roundTrip') : t('common.oneWay')} ·{' '}
+                      {tPurpose(tpl.purpose)}
                     </div>
                   </button>
                   <div className="flex items-center gap-1 shrink-0">
@@ -729,12 +733,12 @@ export function TripLoggerView({
                       onClick={() => void handleQuickLogTemplate(tpl)}
                       className="px-2.5 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/60 rounded-md transition-colors whitespace-nowrap"
                     >
-                      Log Today
+                      {t('logger.logToday')}
                     </button>
                     <button
                       type="button"
                       onClick={() => void onDeleteTemplate(tpl.id)}
-                      aria-label={`Remove ${tpl.label}`}
+                      aria-label={tpl.label}
                       className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-md transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -781,8 +785,8 @@ export function TripLoggerView({
               <div className="space-y-3">
                 <LocationPickerInput
                   id="trip-origin"
-                  label="Origin (Start)"
-                  placeholder="Pick a Curacao store or search LA address..."
+                  label={t('loc.originLabel')}
+                  placeholder={t('loc.originPlaceholder')}
                   value={origin}
                   onChange={handleOriginChange}
                   stores={stores}
@@ -800,15 +804,15 @@ export function TripLoggerView({
                     className="mx-3 inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors disabled:opacity-40 whitespace-nowrap"
                   >
                     <ArrowUpDown className="w-3 h-3" />
-                    Swap
+                    {t('common.swap')}
                   </button>
                   <div className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
                 </div>
 
                 <LocationPickerInput
                   id="trip-destination"
-                  label="Destination (Stop)"
-                  placeholder="Pick a Curacao store, bank, or LA address..."
+                  label={t('loc.destinationLabel')}
+                  placeholder={t('loc.destinationPlaceholder')}
                   value={destination}
                   onChange={handleDestinationChange}
                   stores={stores}
@@ -825,7 +829,7 @@ export function TripLoggerView({
                     htmlFor="trip-date"
                     className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
                   >
-                    Trip Date
+                    {t('logger.tripDate')}
                   </label>
                   <input
                     id="trip-date"
@@ -841,7 +845,7 @@ export function TripLoggerView({
                     htmlFor="trip-purpose"
                     className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
                   >
-                    Business Purpose
+                    {t('logger.businessPurpose')}
                   </label>
                   <select
                     id="trip-purpose"
@@ -854,7 +858,7 @@ export function TripLoggerView({
                   >
                     {TRIP_PURPOSES.map((p) => (
                       <option key={p} value={p}>
-                        {p}
+                        {tPurpose(p)}
                       </option>
                     ))}
                   </select>
@@ -865,16 +869,8 @@ export function TripLoggerView({
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400 -mt-1">
                   <span className="truncate">
                     {purpose === purposeSuggestion.purpose
-                      ? purposeSuggestion.source === 'templates'
-                        ? `Auto-selected from template "${purposeSuggestion.sourceTemplateLabel}"`
-                        : `Auto-selected from keywords (${purposeSuggestion.matchedKeywords.join(', ')})`
-                      : purposeSuggestion.source === 'templates'
-                        ? `Template match suggests ${purposeSuggestion.purpose}`
-                        : `Keywords suggest ${purposeSuggestion.purpose}`}
-                    {purposeSuggestion.matchedKeywords.length > 0 &&
-                    purposeSuggestion.source === 'templates'
-                      ? ` · matched ${purposeSuggestion.matchedKeywords.join(', ')}`
-                      : ''}
+                      ? `${t('expense.autoSelected')} ${tPurpose(purposeSuggestion.purpose)}`
+                      : t('pastDrive.suggested', { purpose: tPurpose(purposeSuggestion.purpose) })}
                   </span>
                   {purpose !== purposeSuggestion.purpose && (
                     <button
@@ -885,7 +881,7 @@ export function TripLoggerView({
                       }}
                       className="text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium whitespace-nowrap"
                     >
-                      Apply {purposeSuggestion.purpose}
+                      {t('logger.applyPurpose', { purpose: tPurpose(purposeSuggestion.purpose) })}
                     </button>
                   )}
                 </div>
@@ -895,7 +891,7 @@ export function TripLoggerView({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <span className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                    Trip Direction
+                    {t('logger.tripDirection')}
                   </span>
                   <div className="grid grid-cols-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
                     <button
@@ -907,7 +903,7 @@ export function TripLoggerView({
                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                       }`}
                     >
-                      One-Way
+                      {t('common.oneWay')}
                     </button>
                     <button
                       type="button"
@@ -918,7 +914,7 @@ export function TripLoggerView({
                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                       }`}
                     >
-                      Round Trip
+                      {t('common.roundTrip')}
                     </button>
                   </div>
                 </div>
@@ -929,15 +925,16 @@ export function TripLoggerView({
                       htmlFor="trip-miles"
                       className="text-xs font-medium text-slate-700 dark:text-slate-300"
                     >
-                      One-Way Miles
+                      {t('logger.oneWayMiles')}
                     </label>
                     <span className="text-xs text-slate-500 dark:text-slate-400">
-                      {manualOverride ? 'Manual' : 'Auto-calculated'}
+                      {manualOverride ? t('logger.manual') : t('logger.autoCalculated')}
                     </span>
                   </div>
                   <input
                     id="trip-miles"
                     type="number"
+                    dir="ltr"
                     min="0"
                     max="2000"
                     step="0.1"
@@ -958,7 +955,7 @@ export function TripLoggerView({
               {activeRouteMeta?.summary && !manualOverride && durationMinutes > 0 && (
                 <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-lg text-xs">
                   <span className="text-slate-700 dark:text-slate-300 truncate">
-                    Active route:{' '}
+                    {t('logger.activeRoute')}{' '}
                     <span className="font-semibold text-slate-900 dark:text-slate-100">
                       {activeRouteMeta.summary}
                     </span>
@@ -972,10 +969,10 @@ export function TripLoggerView({
                           : 'text-emerald-700 dark:text-emerald-400'
                     }`}
                   >
-                    {durationMinutes} min
+                    {durationMinutes} {t('common.min')}
                     {activeRouteMeta.trafficDelayMinutes && activeRouteMeta.trafficDelayMinutes > 0
-                      ? ` (+${activeRouteMeta.trafficDelayMinutes}m traffic)`
-                      : ' · Clear'}
+                      ? ` (${t('logger.trafficDelay', { min: activeRouteMeta.trafficDelayMinutes })})`
+                      : ` · ${t('logger.clearTraffic')}`}
                   </span>
                 </div>
               )}
@@ -990,9 +987,10 @@ export function TripLoggerView({
                     className="mt-0.5 rounded border-slate-300 dark:border-slate-700 text-blue-700 focus:ring-blue-600"
                   />
                   <span>
-                    Subtract normal daily commute ({normalCommuteMiles.toFixed(1)} mi{' '}
-                    {isRoundTrip ? 'each way' : 'one-way'}) for home-to-alternate-store shift
-                    coverage
+                    {t('logger.commuteCheckbox', {
+                      miles: normalCommuteMiles.toFixed(1),
+                      way: isRoundTrip ? t('logger.eachWay') : t('logger.oneWayLower'),
+                    })}
                   </span>
                 </label>
               )}
@@ -1003,7 +1001,7 @@ export function TripLoggerView({
                   htmlFor="trip-notes"
                   className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
                 >
-                  Notes / Transfer Ticket (Optional)
+                  {t('logger.notesLabel')}
                 </label>
                 <input
                   id="trip-notes"
@@ -1011,7 +1009,7 @@ export function TripLoggerView({
                   maxLength={FIELD_LIMITS.notes}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="e.g., Transfer order #4412 — 65-inch TV pickup"
+                  placeholder={t('logger.notesPlaceholder')}
                   className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
                 />
               </div>
@@ -1036,7 +1034,7 @@ export function TripLoggerView({
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                   <span className="text-slate-600 dark:text-slate-400">
-                    Daily total ({formatDisplayDate(tripDate)}):{' '}
+                    {t('logger.dailyTotal', { date: formatLocalizedDate(tripDate) })}{' '}
                     <span
                       className={`font-mono tabular-nums font-semibold ${
                         dailyMileageStatus.severity === 'high'
@@ -1047,15 +1045,8 @@ export function TripLoggerView({
                       }`}
                     >
                       {dailyMileageStatus.projectedMiles.toFixed(1)} /{' '}
-                      {dailyMileageStatus.thresholdMiles.toFixed(0)} mi
+                      {dailyMileageStatus.thresholdMiles.toFixed(0)} {t('common.mi')}
                     </span>
-                    {dailyMileageStatus.existingTripCount > 0 && (
-                      <span className="text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-                        {' '}
-                        ({dailyMileageStatus.existingMiles.toFixed(1)} logged
-                        {billableMiles > 0 ? ` + ${billableMiles.toFixed(1)} this trip` : ''})
-                      </span>
-                    )}
                   </span>
 
                   <button
@@ -1067,7 +1058,7 @@ export function TripLoggerView({
                     className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 whitespace-nowrap"
                   >
                     <SlidersHorizontal className="w-3 h-3" />
-                    {showThresholdEditor ? 'Close' : 'Shift limit'}
+                    {showThresholdEditor ? t('common.close') : t('logger.shiftLimit')}
                   </button>
                 </div>
 
@@ -1075,7 +1066,7 @@ export function TripLoggerView({
                 <div
                   className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"
                   role="progressbar"
-                  aria-label="Daily mileage against retail shift threshold"
+                  aria-label={t('logger.dailyThresholdLabel')}
                   aria-valuenow={Math.round(dailyMileageStatus.projectedMiles)}
                   aria-valuemin={0}
                   aria-valuemax={Math.round(dailyMileageStatus.thresholdMiles)}
@@ -1101,14 +1092,14 @@ export function TripLoggerView({
                   <div className="p-2.5 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-lg space-y-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                        Daily shift commuting threshold (miles)
+                        {t('logger.dailyThresholdLabel')}
                       </span>
                       <button
                         type="button"
                         onClick={() => handleApplyThreshold(DEFAULT_SHIFT_COMMUTE_THRESHOLD_MILES)}
                         className="text-[11px] font-medium text-blue-700 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 whitespace-nowrap"
                       >
-                        Reset ({DEFAULT_SHIFT_COMMUTE_THRESHOLD_MILES} mi)
+                        {t('logger.resetThreshold', { miles: DEFAULT_SHIFT_COMMUTE_THRESHOLD_MILES })}
                       </button>
                     </div>
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -1123,16 +1114,17 @@ export function TripLoggerView({
                               : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                           }`}
                         >
-                          {preset} mi
+                          {preset} {t('common.mi')}
                         </button>
                       ))}
-                      <div className="flex items-center gap-1 ml-auto">
+                      <div className="flex items-center gap-1 ms-auto">
                         <input
                           type="number"
+                          dir="ltr"
                           min={MIN_SHIFT_THRESHOLD_MILES}
                           max={MAX_SHIFT_THRESHOLD_MILES}
                           step="1"
-                          aria-label="Custom daily mileage threshold"
+                          aria-label={t('logger.dailyThresholdLabel')}
                           value={thresholdDraft}
                           onChange={(e) => setThresholdDraft(e.target.value)}
                           className="w-16 px-2 py-1 text-xs font-mono tabular-nums bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded text-slate-900 dark:text-slate-100 focus:outline-none focus:border-blue-600"
@@ -1142,7 +1134,7 @@ export function TripLoggerView({
                           onClick={() => handleApplyThreshold(parseFloat(thresholdDraft))}
                           className="px-2 py-1 text-xs font-medium text-white bg-slate-800 dark:bg-blue-700 hover:bg-slate-900 dark:hover:bg-blue-600 rounded whitespace-nowrap"
                         >
-                          Set
+                          {t('logger.set')}
                         </button>
                       </div>
                     </div>
@@ -1157,11 +1149,11 @@ export function TripLoggerView({
                   >
                     <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-semibold">Approaching retail shift threshold: </span>
-                      <span>
-                        {dailyMileageStatus.projectedMiles.toFixed(1)} mi is{' '}
-                        {dailyMileageStatus.percentOfThreshold}% of your{' '}
-                        {dailyMileageStatus.thresholdMiles.toFixed(0)} mi daily limit.
+                      <span className="font-semibold">{t('logger.approachingTitle')}</span>
+                      <span className="font-mono tabular-nums">
+                        {dailyMileageStatus.projectedMiles.toFixed(1)} /{' '}
+                        {dailyMileageStatus.thresholdMiles.toFixed(0)} {t('common.mi')} (
+                        {dailyMileageStatus.percentOfThreshold}%)
                       </span>
                     </div>
                   </div>
@@ -1189,55 +1181,26 @@ export function TripLoggerView({
                       <div className="space-y-1 min-w-0">
                         <div className="font-semibold">
                           {dailyMileageStatus.severity === 'high'
-                            ? 'High Daily Mileage Alert'
-                            : 'Daily Shift Mileage Threshold Exceeded'}
+                            ? t('logger.highMileageTitle')
+                            : t('logger.exceededTitle')}
                         </div>
-                        <p className="leading-snug">
-                          {billableMiles > 0 ? (
-                            <>
-                              Logging this trip brings your{' '}
-                              <span className="font-mono tabular-nums font-semibold">
-                                {formatDisplayDate(tripDate)}
-                              </span>{' '}
-                              total to{' '}
-                              <span className="font-mono tabular-nums font-semibold">
-                                {dailyMileageStatus.projectedMiles.toFixed(1)} mi
-                              </span>{' '}
-                              (+{dailyMileageStatus.overageMiles.toFixed(1)} mi over your{' '}
-                              {dailyMileageStatus.thresholdMiles.toFixed(0)} mi retail shift
-                              threshold).
-                            </>
-                          ) : (
-                            <>
-                              Your logged trips on{' '}
-                              <span className="font-mono tabular-nums font-semibold">
-                                {formatDisplayDate(tripDate)}
-                              </span>{' '}
-                              already total{' '}
-                              <span className="font-mono tabular-nums font-semibold">
-                                {dailyMileageStatus.existingMiles.toFixed(1)} mi
-                              </span>{' '}
-                              (+{dailyMileageStatus.overageMiles.toFixed(1)} mi over your{' '}
-                              {dailyMileageStatus.thresholdMiles.toFixed(0)} mi retail shift
-                              threshold).
-                            </>
-                          )}
-                        </p>
-                        <p className="text-[11px] opacity-90 leading-snug">
-                          Double-check One-Way vs. Round Trip and add transfer or manager notes if
-                          covering multiple Los Angeles Curacao stores today.
+                        <p className="leading-snug font-mono tabular-nums">
+                          {formatLocalizedDate(tripDate)} ·{' '}
+                          {dailyMileageStatus.projectedMiles.toFixed(1)} {t('common.mi')} (+
+                          {dailyMileageStatus.overageMiles.toFixed(1)} {t('common.mi')} /{' '}
+                          {dailyMileageStatus.thresholdMiles.toFixed(0)} {t('common.mi')})
                         </p>
                       </div>
                     </div>
 
                     {normalCommuteMiles > 0 && !applyCommuteDeduction && (
-                      <div className="pl-6">
+                      <div className="ps-6">
                         <button
                           type="button"
                           onClick={() => setApplyCommuteDeduction(true)}
                           className="px-2.5 py-1 text-xs font-semibold bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 text-amber-950 dark:text-amber-200 hover:bg-amber-100/70 dark:hover:bg-amber-900/50 rounded-md transition-colors whitespace-nowrap"
                         >
-                          Apply {normalCommuteMiles.toFixed(1)} mi commute deduction
+                          {t('logger.applyCommuteBtn', { miles: normalCommuteMiles.toFixed(1) })}
                         </button>
                       </div>
                     )}
@@ -1247,12 +1210,14 @@ export function TripLoggerView({
 
               <div className="flex items-baseline justify-between gap-4">
                 <div>
-                  <div className="text-xs text-slate-500 dark:text-slate-400">Reimbursable Total</div>
-                  <div className="text-xs text-slate-600 dark:text-slate-400 font-mono tabular-nums mt-0.5">
+                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                    {t('logger.reimbursableTotal')}
+                  </div>
+                  <div dir="ltr" className="text-xs text-slate-600 dark:text-slate-400 font-mono tabular-nums mt-0.5">
                     {billableMiles.toFixed(1)} mi × ${ratePerMile.toFixed(2)}/mi
                   </div>
                 </div>
-                <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100">
+                <div dir="ltr" className="text-2xl font-bold font-mono tabular-nums text-slate-900 dark:text-slate-100">
                   {formatCurrency(reimbursementAmount)}
                 </div>
               </div>
@@ -1282,16 +1247,16 @@ export function TripLoggerView({
                   className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 disabled:bg-slate-300 dark:disabled:bg-slate-800 dark:disabled:text-slate-500 disabled:cursor-not-allowed rounded-lg transition-colors whitespace-nowrap"
                 >
                   {isSubmitting ? (
-                    'Saving...'
+                    t('common.saving')
                   ) : isAuthenticated ? (
                     <>
                       <Plus className="w-4 h-4" />
-                      Save Trip to Report Queue
+                      {t('logger.saveTripQueue')}
                     </>
                   ) : (
                     <>
                       <Check className="w-4 h-4" />
-                      Sign In &amp; Save Trip
+                      {t('logger.signInSaveTrip')}
                     </>
                   )}
                 </button>
@@ -1301,11 +1266,11 @@ export function TripLoggerView({
                     type="button"
                     disabled={isSavingTemplate}
                     onClick={() => void handleSaveCurrentAsTemplate()}
-                    title="Save this route for 1-click logging later"
+                    title={t('logger.saveRoute')}
                     className="inline-flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap shrink-0"
                   >
                     <Bookmark className="w-4 h-4" />
-                    Save Route
+                    {t('logger.saveRoute')}
                   </button>
                 )}
               </div>
@@ -1338,14 +1303,14 @@ export function TripLoggerView({
           <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                Queued Non-Mileage Expenses ({readyExpenses.length})
+                {t('logger.queuedExpensesTitle', { count: readyExpenses.length })}
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Included automatically when you generate your next mileage report PDF.
+                {t('logger.queuedExpensesDesc')}
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <span className="text-sm font-bold font-mono tabular-nums text-blue-800 dark:text-blue-400">
+              <span dir="ltr" className="text-sm font-bold font-mono tabular-nums text-blue-800 dark:text-blue-400">
                 {formatCurrency(readyExpensesTotal)}
               </span>
               <button
@@ -1354,7 +1319,7 @@ export function TripLoggerView({
                 className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors whitespace-nowrap"
               >
                 <Plus className="w-3.5 h-3.5" />
-                Add Expense
+                {t('logger.addExpense')}
               </button>
             </div>
           </div>
@@ -1369,10 +1334,10 @@ export function TripLoggerView({
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                       <span className="font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                        {formatDisplayDate(exp.expenseDate)}
+                        {formatLocalizedDate(exp.expenseDate)}
                       </span>
                       <span className="px-1.5 py-0.5 text-[11px] font-semibold bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded">
-                        {exp.category}
+                        {tExpenseCategory(exp.category)}
                       </span>
                       <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
                         {exp.description}
@@ -1380,20 +1345,20 @@ export function TripLoggerView({
                     </div>
                     {(linked || exp.notes) && (
                       <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                        {linked ? `Trip: ${linked.originName} → ${linked.destinationName}` : ''}
+                        {linked ? `${t('logger.tripPrefix')} ${linked.originName} → ${linked.destinationName}` : ''}
                         {linked && exp.notes ? ' · ' : ''}
                         {exp.notes}
                       </div>
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100">
+                    <span dir="ltr" className="font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100">
                       {formatCurrency(exp.amount)}
                     </span>
                     <button
                       type="button"
                       onClick={() => void onDeleteExpense(exp.id)}
-                      aria-label={`Delete ${exp.category} expense`}
+                      aria-label={t('common.delete')}
                       className="p-1 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

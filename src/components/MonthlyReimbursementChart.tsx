@@ -8,22 +8,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { useI18n } from '../lib/i18n';
 import { formatCurrency, round1, round2, type MileageTrip } from '../types/mileage';
-
-const MONTH_LABELS = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-] as const;
 
 interface MonthlyBucket {
   monthIndex: number;
@@ -49,6 +35,7 @@ interface CustomTooltipProps {
 }
 
 function ChartTooltip({ active, payload, scope, year }: CustomTooltipProps) {
+  const { t, tStage, dir } = useI18n();
   if (!active || !payload || payload.length === 0) return null;
   const bucket = payload[0]?.payload;
   if (!bucket) return null;
@@ -57,7 +44,10 @@ function ChartTooltip({ active, payload, scope, year }: CustomTooltipProps) {
     scope === 'submitted' ? bucket.submittedAmount : bucket.totalAmount;
 
   return (
-    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-md px-3.5 py-2.5 text-xs space-y-1.5 min-w-[180px]">
+    <div
+      dir={dir}
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-md px-3.5 py-2.5 text-xs space-y-1.5 min-w-[180px]"
+    >
       <div className="font-semibold text-slate-900 dark:text-slate-100">
         {bucket.month} {year}
       </div>
@@ -65,30 +55,37 @@ function ChartTooltip({ active, payload, scope, year }: CustomTooltipProps) {
         {scope === 'all' ? (
           <>
             <div className="flex items-center justify-between gap-4 text-slate-700 dark:text-slate-300">
-              <span className="font-sans text-slate-500 dark:text-slate-400">Submitted</span>
-              <span>{formatCurrency(bucket.submittedAmount)}</span>
+              <span className="font-sans text-slate-500 dark:text-slate-400">
+                {tStage('submitted')}
+              </span>
+              <span dir="ltr">{formatCurrency(bucket.submittedAmount)}</span>
             </div>
             <div className="flex items-center justify-between gap-4 text-slate-700 dark:text-slate-300">
-              <span className="font-sans text-slate-500 dark:text-slate-400">Ready Queue</span>
-              <span>{formatCurrency(bucket.readyAmount)}</span>
+              <span className="font-sans text-slate-500 dark:text-slate-400">
+                {t('chart.readyQueue')}
+              </span>
+              <span dir="ltr">{formatCurrency(bucket.readyAmount)}</span>
             </div>
             <div className="pt-1 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4 font-semibold text-slate-900 dark:text-slate-100">
-              <span className="font-sans">Total</span>
-              <span>{formatCurrency(shownAmount)}</span>
+              <span className="font-sans">{t('reports.total')}</span>
+              <span dir="ltr">{formatCurrency(shownAmount)}</span>
             </div>
           </>
         ) : (
           <div className="flex items-center justify-between gap-4 font-semibold text-slate-900 dark:text-slate-100">
             <span className="font-sans text-slate-600 dark:text-slate-400 font-normal">
-              Submitted
+              {tStage('submitted')}
             </span>
-            <span>{formatCurrency(shownAmount)}</span>
+            <span dir="ltr">{formatCurrency(shownAmount)}</span>
           </div>
         )}
       </div>
       <div className="pt-1 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-        {bucket.tripCount} {bucket.tripCount === 1 ? 'trip' : 'trips'} ·{' '}
-        {bucket.miles.toFixed(1)} mi
+        {bucket.tripCount}{' '}
+        {bucket.tripCount === 1 ? t('nav.tripSingular') : t('nav.tripPlural')} ·{' '}
+        <span dir="ltr">
+          {bucket.miles.toFixed(1)} {t('common.mi')}
+        </span>
       </div>
     </div>
   );
@@ -99,10 +96,11 @@ export function MonthlyReimbursementChart({
   year = new Date().getFullYear(),
   isDark = false,
 }: MonthlyReimbursementChartProps) {
+  const { t, tStage, monthLabels } = useI18n();
   const [scope, setScope] = useState<'all' | 'submitted'>('all');
 
   const { data, ytdAmount, ytdMiles, peakMonth } = useMemo(() => {
-    const buckets: MonthlyBucket[] = MONTH_LABELS.map((label, idx) => ({
+    const buckets: MonthlyBucket[] = monthLabels.map((label, idx) => ({
       monthIndex: idx,
       month: label,
       submittedAmount: 0,
@@ -151,7 +149,7 @@ export function MonthlyReimbursementChart({
       ytdMiles: totalMi,
       peakMonth: peak,
     };
-  }, [trips, year, scope]);
+  }, [trips, year, scope, monthLabels]);
 
   const gridStroke = isDark ? '#1e293b' : '#e2e8f0';
   const axisTickColor = isDark ? '#94a3b8' : '#64748b';
@@ -164,31 +162,35 @@ export function MonthlyReimbursementChart({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            Monthly Mileage Reimbursement ({year})
+            {t('chart.title', { year })}
           </h2>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
             <span>
-              YTD Total:{' '}
-              <strong className="font-semibold text-slate-900 dark:text-slate-100">
+              {t('chart.ytdTotal')}{' '}
+              <strong className="font-semibold text-slate-900 dark:text-slate-100" dir="ltr">
                 {formatCurrency(ytdAmount)}
               </strong>
             </span>
             <span aria-hidden="true" className="text-slate-300 dark:text-slate-700">
               ·
             </span>
-            <span>{ytdMiles.toFixed(1)} mi</span>
+            <span dir="ltr">
+              {ytdMiles.toFixed(1)} {t('common.mi')}
+            </span>
             {peakMonth && (
               <>
                 <span aria-hidden="true" className="text-slate-300 dark:text-slate-700">
                   ·
                 </span>
                 <span>
-                  Peak: {peakMonth.month} (
-                  {formatCurrency(
-                    scope === 'submitted'
-                      ? peakMonth.submittedAmount
-                      : peakMonth.totalAmount
-                  )}
+                  {t('chart.peak')} {peakMonth.month} (
+                  <span dir="ltr">
+                    {formatCurrency(
+                      scope === 'submitted'
+                        ? peakMonth.submittedAmount
+                        : peakMonth.totalAmount
+                    )}
+                  </span>
                   )
                 </span>
               </>
@@ -206,7 +208,7 @@ export function MonthlyReimbursementChart({
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
             }`}
           >
-            All Logged
+            {t('chart.allLogged')}
           </button>
           <button
             type="button"
@@ -217,13 +219,13 @@ export function MonthlyReimbursementChart({
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
             }`}
           >
-            Submitted Only
+            {t('chart.submittedOnly')}
           </button>
         </div>
       </div>
 
       {/* Recharts Bar Chart Container */}
-      <div className="relative h-64 w-full">
+      <div className="relative h-64 w-full" dir="ltr">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
@@ -255,7 +257,7 @@ export function MonthlyReimbursementChart({
             />
             <Bar
               dataKey="submittedAmount"
-              name="Submitted"
+              name={tStage('submitted')}
               stackId="reimbursement"
               fill={submittedBarFill}
               radius={scope === 'submitted' ? [4, 4, 0, 0] : [0, 0, 0, 0]}
@@ -264,7 +266,7 @@ export function MonthlyReimbursementChart({
             {scope === 'all' && (
               <Bar
                 dataKey="readyAmount"
-                name="Ready Queue"
+                name={t('chart.readyQueue')}
                 stackId="reimbursement"
                 fill={readyBarFill}
                 radius={[4, 4, 0, 0]}
@@ -277,7 +279,7 @@ export function MonthlyReimbursementChart({
         {ytdAmount === 0 && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <p className="text-xs text-slate-500 dark:text-slate-400 bg-white/90 dark:bg-slate-900/90 px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-700">
-              No {scope === 'submitted' ? 'submitted ' : ''}mileage logged in {year} yet.
+              {t('chart.noMileage', { year })}
             </p>
           </div>
         )}
@@ -291,16 +293,16 @@ export function MonthlyReimbursementChart({
               className="w-2.5 h-2.5 rounded-sm bg-blue-700 dark:bg-blue-500"
               aria-hidden="true"
             />
-            Submitted
+            {tStage('submitted')}
           </span>
           {scope === 'all' && (
             <span className="inline-flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-sm bg-blue-300" aria-hidden="true" />
-              Ready to Submit
+              {t('ledger.readyToSubmit')}
             </span>
           )}
         </div>
-        <span>Grouped by trip date ({year})</span>
+        <span>{t('chart.groupedByDate', { year })}</span>
       </div>
     </section>
   );

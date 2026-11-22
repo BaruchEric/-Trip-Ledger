@@ -56,6 +56,11 @@ const CATEGORY_RULES: CategoryRuleSet[] = [
       { phrase: 'i-110 express', weight: 5 },
       { phrase: 'i-10 express', weight: 5 },
       { phrase: '91 express', weight: 5 },
+      { phrase: 'carril expres', weight: 5 },
+      { phrase: 'carril exprés', weight: 5 },
+      { phrase: 'carril rapido', weight: 4.5 },
+      { phrase: 'carril rápido', weight: 4.5 },
+      { phrase: 'נתיב מהיר', weight: 5 },
     ],
     keywords: [
       { word: 'fastrak', weight: 4.5 },
@@ -64,6 +69,8 @@ const CATEGORY_RULES: CategoryRuleSet[] = [
       { word: 'expresslane', weight: 4.5 },
       { word: 'hov', weight: 3 },
       { word: 'carpool', weight: 2.5 },
+      { word: 'expres', weight: 3.5 },
+      { word: 'exprés', weight: 3.5 },
     ],
   },
   {
@@ -95,6 +102,16 @@ const CATEGORY_RULES: CategoryRuleSet[] = [
       { word: 'paybyphone', weight: 4 },
       { word: 'parkmobile', weight: 4 },
       { word: 'validation', weight: 3 },
+      { word: 'estacionamiento', weight: 4.5 },
+      { word: 'parqueo', weight: 4.5 },
+      { word: 'parquimetro', weight: 4 },
+      { word: 'parquímetro', weight: 4 },
+      { word: 'cochera', weight: 3.5 },
+      { word: 'חניה', weight: 4.5 },
+      { word: 'חניון', weight: 4.5 },
+      { word: 'חנייה', weight: 4.5 },
+      { word: 'פנגו', weight: 4 },
+      { word: 'סלופארק', weight: 4 },
     ],
   },
   {
@@ -141,6 +158,16 @@ const CATEGORY_RULES: CategoryRuleSet[] = [
       { word: 'charging', weight: 3 },
       { word: 'gallon', weight: 3 },
       { word: 'gallons', weight: 3 },
+      { word: 'gasolina', weight: 4.5 },
+      { word: 'gasolinera', weight: 4.5 },
+      { word: 'combustible', weight: 4.5 },
+      { word: 'diésel', weight: 4 },
+      { word: 'carga', weight: 2.5 },
+      { word: 'דלק', weight: 4.5 },
+      { word: 'תדלוק', weight: 4.5 },
+      { word: 'בנזין', weight: 4.5 },
+      { word: 'סולר', weight: 4 },
+      { word: 'טעינה', weight: 3.5 },
     ],
   },
   {
@@ -169,6 +196,13 @@ const CATEGORY_RULES: CategoryRuleSet[] = [
       { word: 'transponder', weight: 3.5 },
       { word: 'bridge', weight: 2.5 },
       { word: 'thetolls', weight: 4 },
+      { word: 'peaje', weight: 4.5 },
+      { word: 'peajes', weight: 4.5 },
+      { word: 'caseta', weight: 4 },
+      { word: 'autopista', weight: 3 },
+      { word: 'אגרה', weight: 4.5 },
+      { word: 'אגרות', weight: 4.5 },
+      { word: 'כביש', weight: 2.5 },
     ],
   },
   {
@@ -214,6 +248,17 @@ const CATEGORY_RULES: CategoryRuleSet[] = [
       { word: 'cleaning', weight: 2.5 },
       { word: 'wipes', weight: 2.5 },
       { word: 'cardboard', weight: 3 },
+      { word: 'suministros', weight: 4.5 },
+      { word: 'cajas', weight: 3.5 },
+      { word: 'cinta', weight: 3.5 },
+      { word: 'papeleria', weight: 4 },
+      { word: 'papelería', weight: 4 },
+      { word: 'tinta', weight: 3.5 },
+      { word: 'ציוד', weight: 4.5 },
+      { word: 'אספקה', weight: 4.5 },
+      { word: 'קרטונים', weight: 4 },
+      { word: 'אריזה', weight: 4 },
+      { word: 'משרדי', weight: 3.5 },
     ],
   },
   {
@@ -253,9 +298,9 @@ function normalizeText(value: string): string {
 function tokenizeForHistory(value: string): string[] {
   const tokens = value
     .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .split(/\s+/)
-    .filter((token) => token.length >= 3 && !HISTORY_STOP_WORDS[token] && !/^\d+$/.test(token));
+    .filter((token) => token.length >= 2 && !HISTORY_STOP_WORDS[token] && !/^\d+$/.test(token));
 
   const seen: Record<string, boolean> = {};
   const unique: string[] = [];
@@ -270,13 +315,13 @@ function tokenizeForHistory(value: string): string[] {
 
 function matchPhrase(text: string, phrase: string): boolean {
   if (!text) return false;
-  const pattern = new RegExp(`(^|[^a-z0-9])${escapeRegex(phrase)}($|[^a-z0-9])`, 'i');
+  const pattern = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegex(phrase)}($|[^\\p{L}\\p{N}])`, 'iu');
   return pattern.test(text);
 }
 
 function matchWord(text: string, word: string): boolean {
   if (!text) return false;
-  const pattern = new RegExp(`\\b${escapeRegex(word)}\\b`, 'i');
+  const pattern = new RegExp(`(^|[^\\p{L}\\p{N}])${escapeRegex(word)}($|[^\\p{L}\\p{N}])`, 'iu');
   return pattern.test(text);
 }
 

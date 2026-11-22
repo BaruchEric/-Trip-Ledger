@@ -17,10 +17,10 @@ import {
   Route as RouteIcon,
   X,
 } from 'lucide-react';
+import { useI18n } from '../lib/i18n';
 import {
   formatCurrency,
   formatDateISO,
-  formatDisplayDate,
   type MileageTrip,
   type StoreLocation,
   type TripExpense,
@@ -255,6 +255,7 @@ export function LedgerMapViewModal({
   stores,
   onClose,
 }: LedgerMapViewModalProps) {
+  const { t, tPurpose, formatLocalizedDate } = useI18n();
   const placesLib = useMapsLibrary('places');
   const routesLib = useMapsLibrary('routes');
 
@@ -679,13 +680,20 @@ export function LedgerMapViewModal({
           </button>
           <div className="min-w-0">
             <h2 className="font-display text-sm sm:text-base font-bold text-slate-900 dark:text-slate-100 truncate">
-              Trip Ledger Map View
+              {t('mapView.title')}
             </h2>
             <div className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400 truncate">
-              {rangeTrips.length} {rangeTrips.length === 1 ? 'trip' : 'trips'} ·{' '}
-              {periodTotals.miles.toFixed(1)} mi · {formatCurrency(periodTotals.grandTotal)}
+              {rangeTrips.length}{' '}
+              {rangeTrips.length === 1 ? t('nav.tripSingular') : t('nav.tripPlural')} ·{' '}
+              <span dir="ltr">
+                {periodTotals.miles.toFixed(1)} {t('common.mi')}
+              </span>{' '}
+              · <span dir="ltr">{formatCurrency(periodTotals.grandTotal)}</span>
               {periodTotals.expenseAmount > 0 && (
-                <span> (incl. {formatCurrency(periodTotals.expenseAmount)} exp)</span>
+                <span>
+                  {' '}
+                  (+{formatCurrency(periodTotals.expenseAmount)} {t('nav.expShort')})
+                </span>
               )}
             </div>
           </div>
@@ -695,7 +703,7 @@ export function LedgerMapViewModal({
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5">
             <div className="relative">
-              <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Calendar className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 absolute start-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="date"
                 aria-label="Map start date"
@@ -704,10 +712,10 @@ export function LedgerMapViewModal({
                   setStartDate(e.target.value);
                   setSelectedTripId(null);
                 }}
-                className="pl-8 pr-2 py-1.5 text-xs font-mono tabular-nums bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                className="ps-8 pe-2 py-1.5 text-xs font-mono tabular-nums bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
               />
             </div>
-            <span className="text-xs text-slate-400 dark:text-slate-500">to</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500">{t('mapView.to')}</span>
             <input
               type="date"
               aria-label="Map end date"
@@ -723,10 +731,10 @@ export function LedgerMapViewModal({
           <div className="inline-flex items-center gap-1 p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg">
             {(
               [
-                ['all', 'All'],
+                ['all', t('mapView.all')],
                 ['7d', '7D'],
                 ['30d', '30D'],
-                ['month', 'This Month'],
+                ['month', t('mapView.thisMonth')],
               ] as const
             ).map(([key, label]) => (
               <button
@@ -751,7 +759,7 @@ export function LedgerMapViewModal({
               }`}
             >
               <RouteIcon className="w-3.5 h-3.5" />
-              Road Paths
+              {t('mapView.roadPaths')}
             </button>
           )}
 
@@ -764,17 +772,17 @@ export function LedgerMapViewModal({
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap"
           >
             <Crosshair className="w-3.5 h-3.5" />
-            Fit All
+            {t('mapView.fitAll')}
           </button>
 
           <button
             type="button"
             onClick={onClose}
-            aria-label="Close Map View"
+            aria-label={t('common.close')}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 rounded-lg transition-colors whitespace-nowrap"
           >
             <X className="w-3.5 h-3.5" />
-            Close
+            {t('common.close')}
           </button>
         </div>
       </header>
@@ -783,10 +791,10 @@ export function LedgerMapViewModal({
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
         {/* Chronological Trip Path Drawer */}
         {sidebarOpen && (
-          <aside className="w-full lg:w-80 xl:w-96 max-h-[38vh] lg:max-h-none shrink-0 bg-white dark:bg-slate-900 border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
+          <aside className="w-full lg:w-80 xl:w-96 max-h-[38vh] lg:max-h-none shrink-0 bg-white dark:bg-slate-900 border-b lg:border-b-0 lg:border-e border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden">
             <div className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70 flex items-center justify-between gap-2">
               <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                Chronological Travel Path ({rangeTrips.length})
+                {t('mapView.timelineTitle', { count: rangeTrips.length })}
               </span>
               {selectedTripId && (
                 <button
@@ -797,7 +805,7 @@ export function LedgerMapViewModal({
                   }}
                   className="text-xs font-medium text-blue-700 dark:text-blue-400 hover:underline whitespace-nowrap"
                 >
-                  Show all legs
+                  {t('mapView.showAllLegs')}
                 </button>
               )}
             </div>
@@ -806,10 +814,10 @@ export function LedgerMapViewModal({
               <div className="p-6 text-center space-y-3 my-auto">
                 <MapPin className="w-6 h-6 text-slate-400 dark:text-slate-500 mx-auto" />
                 <div className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                  No trips in this date range
+                  {t('mapView.noTripsRange')}
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Adjust the start or end date above to view trips and travel paths on the map.
+                  {t('mapView.noTripsRangeDesc')}
                 </p>
                 {trips.length > 0 && (
                   <button
@@ -817,7 +825,7 @@ export function LedgerMapViewModal({
                     onClick={() => applyPreset('all')}
                     className="px-3 py-1.5 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg transition-colors whitespace-nowrap"
                   >
-                    Reset to All Dates
+                    {t('mapView.resetAllDates')}
                   </button>
                 )}
               </div>
@@ -834,7 +842,7 @@ export function LedgerMapViewModal({
                         setActivePinKey(null);
                         setSelectedTripId((prev) => (prev === trip.id ? null : trip.id));
                       }}
-                      className={`w-full text-left px-4 py-3 transition-colors ${
+                      className={`w-full text-start px-4 py-3 transition-colors ${
                         isSelected
                           ? 'bg-blue-50/85 dark:bg-blue-950/55'
                           : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
@@ -856,9 +864,12 @@ export function LedgerMapViewModal({
                         </span>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2 text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                            <span>{formatDisplayDate(trip.tripDate)}</span>
-                            <span className="font-semibold text-slate-900 dark:text-slate-100">
-                              {trip.billableMiles.toFixed(1)} mi ·{' '}
+                            <span>{formatLocalizedDate(trip.tripDate)}</span>
+                            <span
+                              className="font-semibold text-slate-900 dark:text-slate-100"
+                              dir="ltr"
+                            >
+                              {trip.billableMiles.toFixed(1)} {t('common.mi')} ·{' '}
                               {formatCurrency(trip.reimbursementAmount + tripExp)}
                             </span>
                           </div>
@@ -866,8 +877,11 @@ export function LedgerMapViewModal({
                             {trip.originName} → {trip.destinationName}
                           </div>
                           <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
-                            {trip.purpose} · {trip.isRoundTrip ? 'Round Trip' : 'One-Way'}
-                            {tripExp > 0 ? ` · +${formatCurrency(tripExp)} exp` : ''}
+                            {tPurpose(trip.purpose)} ·{' '}
+                            {trip.isRoundTrip ? t('common.roundTrip') : t('common.oneWay')}
+                            {tripExp > 0
+                              ? ` · +${formatCurrency(tripExp)} ${t('nav.expShort')}`
+                              : ''}
                           </div>
                         </div>
                       </div>
@@ -963,10 +977,10 @@ export function LedgerMapViewModal({
                           setSelectedTripId(v.trip.id);
                           setActivePinKey(null);
                         }}
-                        className="w-full text-left px-1.5 py-1 rounded hover:bg-slate-100 transition-colors"
+                        className="w-full text-start px-1.5 py-1 rounded hover:bg-slate-100 transition-colors"
                       >
                         <div className="text-[11px] font-mono text-slate-500">
-                          Leg #{v.chronologicalIndex} · {formatDisplayDate(v.trip.tripDate)} ·{' '}
+                          #{v.chronologicalIndex} · {formatLocalizedDate(v.trip.tripDate)} ·{' '}
                           {v.role}
                         </div>
                         <div className="text-[11px] font-medium text-slate-900 truncate">
@@ -984,27 +998,27 @@ export function LedgerMapViewModal({
           {isResolving && (
             <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm inline-flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-200 pointer-events-none">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-700 dark:text-blue-400" />
-              Plotting trips &amp; travel path...
+              {t('mapView.plotting')}
             </div>
           )}
 
           {/* Compact Map Legend Overlay */}
-          <div className="absolute left-3 bottom-3 px-3 py-2 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-700 dark:text-slate-300">
+          <div className="absolute start-3 bottom-3 px-3 py-2 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-700 dark:text-slate-300">
             <span className="inline-flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-700" />
-              First Start
+              {t('mapView.firstStart')}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-              Route Stop
+              {t('mapView.routeStop')}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-amber-600" />
-              Final Stop
+              {t('mapView.finalStop')}
             </span>
             <span className="inline-flex items-center gap-1.5">
               <span className="w-4 h-0.5 bg-blue-600 inline-block" />
-              Driven Path
+              {t('mapView.drivenPath')}
             </span>
           </div>
         </div>

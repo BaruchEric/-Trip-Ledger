@@ -18,6 +18,7 @@ import {
   type DetectedDrive,
 } from '../lib/driveDetection';
 import { suggestTripPurpose } from '../lib/purposeSuggestion';
+import { useI18n } from '../lib/i18n';
 import {
   calculateReimbursement,
   formatCurrency,
@@ -39,13 +40,6 @@ function formatTimer(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-}
-
-function formatClockTime(timestamp: number): string {
-  return new Date(timestamp).toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-  });
 }
 
 export function resolveDetectedDriveEndpoints(
@@ -135,6 +129,7 @@ export function DriveTrackingHeader({
   onStopManualLiveDrive,
   onFinishAutoDriveNow,
 }: DriveTrackingHeaderProps) {
+  const { t, isRtl } = useI18n();
   const [showSettings, setShowSettings] = useState(false);
 
   // Pick two live Google Maps-discovered Curacao stores for desktop preview simulation
@@ -180,10 +175,10 @@ export function DriveTrackingHeader({
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs font-semibold text-red-700 dark:text-red-400">
               <Navigation2 className="w-4 h-4 shrink-0" />
-              <span>Recording Manual Live Drive</span>
+              <span>{t('drive.recordingManual')}</span>
             </div>
             <div className="font-mono tabular-nums text-xs font-semibold text-slate-900 dark:text-slate-100">
-              {gpsTracker.milesDriven.toFixed(1)} mi · {formatTimer(gpsTracker.elapsedSeconds)}
+              {gpsTracker.milesDriven.toFixed(1)} {t('common.mi')} · {formatTimer(gpsTracker.elapsedSeconds)}
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -193,14 +188,14 @@ export function DriveTrackingHeader({
               className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors whitespace-nowrap"
             >
               <Square className="w-3.5 h-3.5 fill-current" />
-              Stop &amp; Fill Trip
+              {t('drive.stopAndFill')}
             </button>
             <button
               type="button"
               onClick={gpsTracker.cancelTracking}
               className="px-3 py-2 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg transition-colors whitespace-nowrap"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         </div>
@@ -223,7 +218,7 @@ export function DriveTrackingHeader({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                    Auto-Detect Drives
+                    {t('drive.autoDetect')}
                   </span>
                   <span
                     className={`text-[11px] font-mono tabular-nums font-medium ${
@@ -235,26 +230,28 @@ export function DriveTrackingHeader({
                     }`}
                   >
                     {autoDetector.phase === 'off'
-                      ? 'Off'
+                      ? t('drive.phaseOff')
                       : autoDetector.phase === 'monitoring'
-                        ? `Standby · ${autoDetector.currentSpeedMph.toFixed(0)} mph`
+                        ? t('drive.phaseStandby', { speed: autoDetector.currentSpeedMph.toFixed(0) })
                         : autoDetector.phase === 'driving'
-                          ? `Driving · ${autoDetector.currentSpeedMph.toFixed(0)} mph`
-                          : `Parked · ${formatTimer(autoDetector.parkedCountdownSeconds ?? 0)}`}
+                          ? t('drive.phaseDriving', { speed: autoDetector.currentSpeedMph.toFixed(0) })
+                          : t('drive.phaseParked', {
+                              time: formatTimer(autoDetector.parkedCountdownSeconds ?? 0),
+                            })}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                   {autoDetector.phase === 'off'
-                    ? `Auto-starts at ${autoDetector.settings.startSpeedMph}+ mph and captures stops.`
+                    ? t('drive.descOff', { speed: autoDetector.settings.startSpeedMph })
                     : autoDetector.phase === 'monitoring'
-                      ? `Watching GPS motion · triggers at ${autoDetector.settings.startSpeedMph} mph${
+                      ? `${t('drive.descMonitoring', { speed: autoDetector.settings.startSpeedMph })}${
                           autoDetector.gpsAccuracyMeters !== null
                             ? ` · ±${autoDetector.gpsAccuracyMeters}m`
                             : ''
                         }`
                       : autoDetector.phase === 'driving'
-                        ? 'Hands-free GPS trip capture active on map.'
-                        : 'Waiting to confirm stop before adding trip to review queue.'}
+                        ? t('drive.descDriving')
+                        : t('drive.descParked')}
                 </p>
               </div>
             </div>
@@ -265,7 +262,7 @@ export function DriveTrackingHeader({
                 type="button"
                 role="switch"
                 aria-checked={autoDetector.isEnabled}
-                aria-label="Toggle Automated Driving Detection"
+                aria-label={t('drive.autoDetect')}
                 onClick={handleToggleAuto}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-600/30 ${
                   autoDetector.isEnabled
@@ -275,7 +272,13 @@ export function DriveTrackingHeader({
               >
                 <span
                   className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    autoDetector.isEnabled ? 'translate-x-6' : 'translate-x-1'
+                    isRtl
+                      ? autoDetector.isEnabled
+                        ? '-translate-x-6'
+                        : '-translate-x-1'
+                      : autoDetector.isEnabled
+                        ? 'translate-x-6'
+                        : 'translate-x-1'
                   }`}
                 />
               </button>
@@ -284,8 +287,7 @@ export function DriveTrackingHeader({
                 type="button"
                 onClick={() => setShowSettings((prev) => !prev)}
                 aria-expanded={showSettings}
-                aria-label="Auto-detect driving settings"
-                title="Detection thresholds & test drive"
+                aria-label={t('drive.triggerSpeed')}
                 className={`p-1.5 rounded-lg border transition-colors ${
                   showSettings
                     ? 'bg-blue-50 dark:bg-blue-950/60 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-400'
@@ -302,7 +304,7 @@ export function DriveTrackingHeader({
                   className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap"
                 >
                   <Navigation2 className="w-3.5 h-3.5 text-blue-700 dark:text-blue-400" />
-                  Start Drive
+                  {t('drive.startDrive')}
                 </button>
               )}
             </div>
@@ -314,13 +316,13 @@ export function DriveTrackingHeader({
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span className="font-medium text-slate-700 dark:text-slate-200">
                   {autoDetector.isSimulating
-                    ? 'Simulated Drive in Progress'
+                    ? t('drive.simulatedInProgress')
                     : autoDetector.phase === 'parked_cooldown'
-                      ? 'Vehicle Parked — Confirming Trip End'
-                      : 'Active Drive Detected'}
+                      ? t('drive.vehicleParked')
+                      : t('drive.activeDetected')}
                 </span>
                 <span className="font-mono tabular-nums font-semibold text-slate-900 dark:text-slate-100">
-                  {autoDetector.activeMiles.toFixed(1)} mi ·{' '}
+                  {autoDetector.activeMiles.toFixed(1)} {t('common.mi')} ·{' '}
                   {formatTimer(autoDetector.activeElapsedSeconds)} ·{' '}
                   {autoDetector.currentSpeedMph.toFixed(0)} mph
                 </span>
@@ -332,14 +334,14 @@ export function DriveTrackingHeader({
                   className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 rounded-lg transition-colors whitespace-nowrap"
                 >
                   <Check className="w-3.5 h-3.5" />
-                  End &amp; Capture Drive
+                  {t('drive.endAndCapture')}
                 </button>
                 <button
                   type="button"
                   onClick={autoDetector.discardActiveDrive}
                   className="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-lg transition-colors whitespace-nowrap"
                 >
-                  Discard
+                  {t('drive.discard')}
                 </button>
               </div>
             </div>
@@ -351,9 +353,9 @@ export function DriveTrackingHeader({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
                   <span className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
-                    Trigger Speed
+                    {t('drive.triggerSpeed')}
                   </span>
-                  <div className="grid grid-cols-3 gap-1">
+                  <div className="grid grid-cols-3 gap-1" dir="ltr">
                     {START_SPEED_PRESETS.map((mph) => (
                       <button
                         key={mph}
@@ -373,9 +375,9 @@ export function DriveTrackingHeader({
 
                 <div>
                   <span className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
-                    Stop Wait
+                    {t('drive.stopWait')}
                   </span>
-                  <div className="grid grid-cols-4 gap-1">
+                  <div className="grid grid-cols-4 gap-1" dir="ltr">
                     {STOP_COOLDOWN_PRESETS.map(({ seconds, label }) => (
                       <button
                         key={seconds}
@@ -395,9 +397,9 @@ export function DriveTrackingHeader({
 
                 <div>
                   <span className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1">
-                    Min Distance
+                    {t('drive.minDistance')}
                   </span>
-                  <div className="grid grid-cols-3 gap-1">
+                  <div className="grid grid-cols-3 gap-1" dir="ltr">
                     {MIN_TRIP_MILES_PRESETS.map((mi) => (
                       <button
                         key={mi}
@@ -419,8 +421,11 @@ export function DriveTrackingHeader({
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1.5 border-t border-slate-200/70 dark:border-slate-800">
                 <span className="text-[11px] text-slate-500 dark:text-slate-400">
                   {simulationPair
-                    ? `Preview detection: ${simulationPair.fromStore.shortName} → ${simulationPair.toStore.shortName}`
-                    : 'Waiting for Curacao store locations to load...'}
+                    ? t('drive.previewRoute', {
+                        from: simulationPair.fromStore.shortName,
+                        to: simulationPair.toStore.shortName,
+                      })
+                    : t('drive.waitingStores')}
                 </span>
                 <button
                   type="button"
@@ -429,7 +434,7 @@ export function DriveTrackingHeader({
                   className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800/70 hover:bg-blue-100 dark:hover:bg-blue-900/60 disabled:opacity-45 disabled:cursor-not-allowed rounded-md transition-colors whitespace-nowrap shrink-0"
                 >
                   <Play className="w-3 h-3 fill-current" />
-                  {autoDetector.isSimulating ? 'Simulating...' : 'Simulate LA Drive'}
+                  {autoDetector.isSimulating ? t('drive.simulating') : t('drive.simulateDrive')}
                 </button>
               </div>
             </div>
@@ -473,6 +478,7 @@ export function DetectedDrivesInbox({
   onDismissDrive,
   onClearAll,
 }: DetectedDrivesInboxProps) {
+  const { t, tPurpose, formatLocalizedClock } = useI18n();
   const resolvedDrives = useMemo(
     () =>
       drives.map((drive) =>
@@ -485,7 +491,7 @@ export function DetectedDrivesInbox({
 
   return (
     <section
-      aria-label="Auto-Detected Drives Pending Review"
+      aria-label={t('drive.inboxTitle', { count: resolvedDrives.length })}
       className="bg-white dark:bg-slate-900 border border-emerald-300/80 dark:border-emerald-800/80 rounded-xl overflow-hidden"
     >
       <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-emerald-50/50 dark:bg-emerald-950/30 flex flex-wrap items-center justify-between gap-2">
@@ -495,11 +501,10 @@ export function DetectedDrivesInbox({
           </div>
           <div className="min-w-0">
             <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              Auto-Detected Drives Ready to Review ({resolvedDrives.length})
+              {t('drive.inboxTitle', { count: resolvedDrives.length })}
             </h2>
             <p className="text-xs text-slate-600 dark:text-slate-400">
-              Confirm business drives in 1 click, load into the form to edit, or dismiss personal
-              trips.
+              {t('drive.inboxSubtitle')}
             </p>
           </div>
         </div>
@@ -509,7 +514,7 @@ export function DetectedDrivesInbox({
             onClick={onClearAll}
             className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 whitespace-nowrap"
           >
-            Dismiss all
+            {t('drive.dismissAll')}
           </button>
         )}
       </div>
@@ -526,24 +531,25 @@ export function DetectedDrivesInbox({
               </div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500 dark:text-slate-400">
                 <span className="font-mono tabular-nums font-semibold text-slate-800 dark:text-slate-200">
-                  {item.drive.milesDriven.toFixed(1)} mi
+                  {item.drive.milesDriven.toFixed(1)} {t('common.mi')}
                 </span>
                 <span aria-hidden="true">·</span>
-                <span className="font-mono tabular-nums">
+                <span dir="ltr" className="font-mono tabular-nums">
                   {formatCurrency(item.reimbursementEstimate)}
                 </span>
                 <span aria-hidden="true">·</span>
                 <span className="font-mono tabular-nums">
-                  {item.drive.durationMinutes} min ({formatClockTime(item.drive.startedAt)}–
-                  {formatClockTime(item.drive.endedAt)})
+                  {item.drive.durationMinutes} {t('common.min')} (
+                  {formatLocalizedClock(item.drive.startedAt)}–
+                  {formatLocalizedClock(item.drive.endedAt)})
                 </span>
                 <span aria-hidden="true">·</span>
-                <span>{item.suggestedPurpose}</span>
+                <span>{tPurpose(item.suggestedPurpose)}</span>
                 {item.drive.isSimulated && (
                   <>
                     <span aria-hidden="true">·</span>
                     <span className="text-blue-700 dark:text-blue-400 font-medium">
-                      Simulated preview
+                      {t('drive.simulatedPreview')}
                     </span>
                   </>
                 )}
@@ -558,7 +564,7 @@ export function DetectedDrivesInbox({
                 className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap"
               >
                 <Check className="w-3.5 h-3.5" />
-                Log Trip
+                {t('nav.log')}
               </button>
               <button
                 type="button"
@@ -567,12 +573,12 @@ export function DetectedDrivesInbox({
                 className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap"
               >
                 <Edit3 className="w-3.5 h-3.5" />
-                Review
+                {t('drive.review')}
               </button>
               <button
                 type="button"
                 onClick={() => onDismissDrive(item.drive.id)}
-                aria-label="Dismiss detected drive"
+                aria-label={t('common.dismiss')}
                 className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-md transition-colors"
               >
                 <X className="w-4 h-4" />

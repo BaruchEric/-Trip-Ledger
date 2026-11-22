@@ -29,6 +29,7 @@ import {
   type RoutePriority,
   type TrafficRouteOption,
 } from '../lib/trafficRouteAdvisor';
+import { useI18n } from '../lib/i18n';
 import {
   DEFAULT_RATE_PER_MILE,
   formatCurrency,
@@ -513,6 +514,7 @@ export function RouteMapPanel({
   onSetDestination,
   onRouteComputed,
 }: RouteMapPanelProps) {
+  const { t, formatLocalizedClock } = useI18n();
   const [selectedStore, setSelectedStore] = useState<StoreLocation | null>(null);
   const [routeOptions, setRouteOptions] = useState<TrafficRouteOption[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
@@ -613,11 +615,8 @@ export function RouteMapPanel({
 
   const updatedTimeLabel = useMemo(() => {
     if (!trafficUpdatedAt) return '';
-    return trafficUpdatedAt.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  }, [trafficUpdatedAt]);
+    return formatLocalizedClock(trafficUpdatedAt.getTime());
+  }, [trafficUpdatedAt, formatLocalizedClock]);
 
   const showCustomOriginMarker =
     origin &&
@@ -637,30 +636,33 @@ export function RouteMapPanel({
       <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            Los Angeles Curacao Route Map
+            {t('routeMap.title')}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {storesLoading
-              ? 'Loading Curacao locations across Los Angeles...'
+              ? t('routeMap.loadingStores')
               : storesError
                 ? storesError
-                : `${stores.length} Curacao stores discovered · Live traffic routing enabled`}
+                : t('routeMap.storesSummary', { count: stores.length })}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           {activeRoute && (
-            <div className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-200 font-mono tabular-nums mr-1">
+            <div
+              className="flex items-center gap-2.5 text-xs text-slate-700 dark:text-slate-200 font-mono tabular-nums me-1"
+              dir="ltr"
+            >
               <span className="inline-flex items-center gap-1 font-semibold text-blue-800 dark:text-blue-400">
                 <RouteIcon className="w-3.5 h-3.5" />
-                {activeRoute.oneWayMiles.toFixed(1)} mi
+                {activeRoute.oneWayMiles.toFixed(1)} {t('common.mi')}
               </span>
               <span aria-hidden="true" className="text-slate-300 dark:text-slate-600">
                 ·
               </span>
               <span className="inline-flex items-center gap-1 text-slate-700 dark:text-slate-200 font-semibold">
                 <Clock className="w-3.5 h-3.5" />
-                {activeRoute.durationMinutes} min
+                {activeRoute.durationMinutes} {t('common.min')}
               </span>
             </div>
           )}
@@ -674,10 +676,9 @@ export function RouteMapPanel({
                 ? 'bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800/80 text-emerald-800 dark:text-emerald-300'
                 : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700'
             }`}
-            title="Toggle real-time LA traffic overlay"
           >
             <Layers className="w-3.5 h-3.5" />
-            Live Traffic
+            {t('routeMap.liveTraffic')}
           </button>
 
           <button
@@ -685,10 +686,9 @@ export function RouteMapPanel({
             onClick={onRefreshStores}
             disabled={storesLoading}
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors whitespace-nowrap disabled:opacity-50"
-            title="Refresh Curacao store locations"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${storesLoading ? 'animate-spin' : ''}`} />
-            Stores
+            {t('routeMap.stores')}
           </button>
         </div>
       </div>
@@ -824,7 +824,7 @@ export function RouteMapPanel({
                     }}
                     className="flex-1 px-2.5 py-1.5 text-xs font-medium text-white bg-emerald-700 hover:bg-emerald-800 rounded transition-colors whitespace-nowrap"
                   >
-                    Set Origin
+                    {t('routeMap.setOrigin')}
                   </button>
                   <button
                     type="button"
@@ -840,7 +840,7 @@ export function RouteMapPanel({
                     }}
                     className="flex-1 px-2.5 py-1.5 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 rounded transition-colors whitespace-nowrap"
                   >
-                    Set Dest
+                    {t('routeMap.setDest')}
                   </button>
                 </div>
               </div>
@@ -851,7 +851,7 @@ export function RouteMapPanel({
         {routesLoading && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1.5 bg-white/95 dark:bg-slate-900/95 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm inline-flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-200 pointer-events-none">
             <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-700 dark:text-blue-400" />
-            Analyzing real-time LA traffic routes...
+            {t('routeMap.analyzing')}
           </div>
         )}
       </div>
@@ -859,7 +859,7 @@ export function RouteMapPanel({
       {/* Real-Time Traffic Route Advisor Panel */}
       {origin && destination && (
         <section
-          aria-label="Real-Time Traffic Route Suggestions"
+          aria-label={t('routeMap.advisorTitle')}
           className="border-t border-slate-200 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-950/60 p-4 space-y-3"
         >
           {/* Advisor Header & Controls */}
@@ -871,24 +871,20 @@ export function RouteMapPanel({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                   <h3 className="text-xs font-semibold text-slate-900 dark:text-slate-100">
-                    Real-Time Traffic Route Advisor
+                    {t('routeMap.advisorTitle')}
                   </h3>
                   {updatedTimeLabel && (
                     <span className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                      Updated {updatedTimeLabel}
+                      {t('routeMap.updated', { time: updatedTimeLabel })}
                     </span>
                   )}
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                   {routesLoading
-                    ? 'Comparing alternative routes with live traffic conditions...'
+                    ? t('routeMap.comparing')
                     : activeRoute
-                      ? activeRoute.timeSavedVsSlowestMin > 0 && routeOptions.length > 1
-                        ? `Suggested route (${activeRoute.summary}) saves ${activeRoute.timeSavedVsSlowestMin} min vs slower alternatives.`
-                        : activeRoute.trafficDelayMinutes > 0
-                          ? `Current ETA includes +${activeRoute.trafficDelayMinutes} min live traffic delay (${activeRoute.summary}).`
-                          : `Roads are clear on ${activeRoute.summary} right now.`
-                      : 'Select origin and destination to compare live traffic routes.'}
+                      ? activeRoute.summary
+                      : ''}
                 </p>
               </div>
             </div>
@@ -897,14 +893,14 @@ export function RouteMapPanel({
               {/* Priority Mode Segmented Control */}
               <div
                 role="group"
-                aria-label="Route efficiency priority"
+                aria-label={t('routeMap.advisorTitle')}
                 className="inline-flex items-center p-0.5 bg-slate-200/75 dark:bg-slate-800 rounded-md"
               >
                 {(
                   [
-                    ['fastest', 'Fastest'],
-                    ['balanced', 'Balanced'],
-                    ['shortest', 'Shortest'],
+                    ['fastest', t('routeMap.fastest')],
+                    ['balanced', t('routeMap.balanced')],
+                    ['shortest', t('routeMap.shortest')],
                   ] as const
                 ).map(([mode, label]) => (
                   <button
@@ -933,7 +929,7 @@ export function RouteMapPanel({
                     : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
-                Avoid Tolls
+                {t('routeMap.avoidTolls')}
               </button>
 
               <button
@@ -946,14 +942,13 @@ export function RouteMapPanel({
                     : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                 }`}
               >
-                No Freeways
+                {t('routeMap.noFreeways')}
               </button>
 
               <button
                 type="button"
                 disabled={routesLoading}
                 onClick={() => setRefreshNonce((n) => n + 1)}
-                title="Refresh real-time traffic ETA"
                 aria-label="Refresh real-time traffic"
                 className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 rounded-md transition-colors"
               >
@@ -998,7 +993,7 @@ export function RouteMapPanel({
                     type="button"
                     onClick={() => handleSelectRoute(opt.index, true)}
                     aria-pressed={isSelected}
-                    className={`text-left p-3 rounded-lg border transition-all flex flex-col justify-between gap-2 ${
+                    className={`text-start p-3 rounded-lg border transition-all flex flex-col justify-between gap-2 ${
                       isSelected
                         ? 'bg-white dark:bg-slate-900 border-blue-600 dark:border-blue-500 ring-1 ring-blue-600/25 dark:ring-blue-500/30'
                         : 'bg-white/80 dark:bg-slate-900/70 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
@@ -1019,7 +1014,7 @@ export function RouteMapPanel({
                         {isSelected && (
                           <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-blue-700 dark:text-blue-400 whitespace-nowrap">
                             <Check className="w-3 h-3" />
-                            Selected
+                            {t('routeMap.selected')}
                           </span>
                         )}
                       </div>
@@ -1031,12 +1026,12 @@ export function RouteMapPanel({
 
                       {/* Real-Time ETA & Traffic Condition */}
                       <div className="flex flex-wrap items-baseline justify-between gap-1.5">
-                        <div className="flex items-baseline gap-1.5 font-mono tabular-nums">
+                        <div className="flex items-baseline gap-1.5 font-mono tabular-nums" dir="ltr">
                           <span className="text-base font-bold text-slate-900 dark:text-slate-100">
-                            {opt.durationMinutes} min
+                            {opt.durationMinutes} {t('common.min')}
                           </span>
                           <span className="text-xs text-slate-500 dark:text-slate-400">
-                            {opt.oneWayMiles.toFixed(1)} mi
+                            {opt.oneWayMiles.toFixed(1)} {t('common.mi')}
                           </span>
                         </div>
                         <span
@@ -1044,8 +1039,8 @@ export function RouteMapPanel({
                         >
                           <Activity className="w-2.5 h-2.5 shrink-0" />
                           {opt.trafficDelayMinutes > 0
-                            ? `+${opt.trafficDelayMinutes}m traffic`
-                            : 'Clear'}
+                            ? t('logger.trafficDelay', { min: opt.trafficDelayMinutes })
+                            : t('logger.clearTraffic')}
                         </span>
                       </div>
                     </div>
@@ -1103,28 +1098,28 @@ export function RouteMapPanel({
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           <span className="inline-flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-700" aria-hidden="true" />
-            Origin (A)
+            {t('miniMap.originA')}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-600" aria-hidden="true" />
-            Destination (B)
+            {t('miniMap.destB')}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="w-3 h-1 rounded-full bg-blue-700" aria-hidden="true" />
-            Normal
+            {t('routeMap.normal')}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="w-3 h-1 rounded-full bg-amber-500" aria-hidden="true" />
-            Slow
+            {t('routeMap.slow')}
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="w-3 h-1 rounded-full bg-red-600" aria-hidden="true" />
-            Heavy
+            {t('routeMap.heavy')}
           </span>
         </div>
         <span className="inline-flex items-center gap-1 text-slate-500 dark:text-slate-400">
           <Navigation className="w-3 h-3" />
-          Google Maps Routes API · Real-time traffic
+          {t('routeMap.poweredBy')}
         </span>
       </div>
     </div>

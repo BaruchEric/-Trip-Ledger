@@ -17,6 +17,7 @@ import {
   Car,
   FileSpreadsheet,
   FileText,
+  Globe,
   LogIn,
   LogOut,
   Menu,
@@ -53,6 +54,12 @@ import {
   signOutUser,
 } from './lib/firebase';
 import {
+  I18nProvider,
+  LOCALE_OPTIONS,
+  useI18n,
+  type MessageKey,
+} from './lib/i18n';
+import {
   DEFAULT_RATE_PER_MILE,
   FIELD_LIMITS,
   formatCurrency,
@@ -74,27 +81,27 @@ const MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undef
 
 const NAV_ITEMS: Array<{
   id: ActiveView;
-  label: string;
-  breadcrumb: string;
+  labelKey: MessageKey;
   icon: React.ComponentType<{ className?: string }>;
 }> = [
-  { id: 'log', label: 'Log Trip', breadcrumb: 'Log Trip', icon: Route },
-  { id: 'ledger', label: 'Trip Ledger', breadcrumb: 'Trip Ledger', icon: FileSpreadsheet },
-  { id: 'reports', label: 'Reports', breadcrumb: 'Reports', icon: FileText },
-  { id: 'settings', label: 'Profile & Rate', breadcrumb: 'Profile & Rate', icon: Settings },
+  { id: 'log', labelKey: 'nav.log', icon: Route },
+  { id: 'ledger', labelKey: 'nav.ledger', icon: FileSpreadsheet },
+  { id: 'reports', labelKey: 'nav.reports', icon: FileText },
+  { id: 'settings', labelKey: 'nav.settings', icon: Settings },
 ];
 
 const THEME_OPTIONS: Array<{
   value: ThemePreference;
-  label: string;
+  labelKey: MessageKey;
   Icon: React.ComponentType<{ className?: string }>;
 }> = [
-  { value: 'light', label: 'Light', Icon: Sun },
-  { value: 'dark', label: 'Dark', Icon: Moon },
-  { value: 'system', label: 'System', Icon: Monitor },
+  { value: 'light', labelKey: 'theme.light', Icon: Sun },
+  { value: 'dark', labelKey: 'theme.dark', Icon: Moon },
+  { value: 'system', labelKey: 'theme.system', Icon: Monitor },
 ];
 
 function WorkspaceShell() {
+  const { locale, setLocale, t } = useI18n();
   const [activeView, setActiveView] = useState<ActiveView>('log');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
@@ -224,9 +231,9 @@ function WorkspaceShell() {
       await signInWithGoogle();
     } catch (err) {
       console.error('Google sign-in error:', err);
-      setAuthError('Sign-in popup was closed or blocked. Please try again.');
+      setAuthError(t('auth.popupError'));
     }
-  }, []);
+  }, [t]);
 
   const handleSignOut = useCallback(async () => {
     try {
@@ -677,15 +684,15 @@ function WorkspaceShell() {
 
   return (
     <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
-      {/* Desktop Left Sidebar (256px) */}
-      <aside className="no-print hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800">
+      {/* Desktop Sidebar (256px) */}
+      <aside className="no-print hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 bg-white dark:bg-slate-900 border-e border-slate-200 dark:border-slate-800">
         {/* Single-line Brand Wordmark */}
         <div className="h-16 px-5 flex items-center gap-2.5 border-b border-slate-200 dark:border-slate-800">
           <div className="w-8 h-8 rounded-lg bg-blue-700 dark:bg-blue-600 text-white flex items-center justify-center shrink-0">
             <Car className="w-4 h-4" />
           </div>
           <span className="font-display text-base font-bold tracking-tight text-slate-900 dark:text-slate-100 whitespace-nowrap">
-            Curacao Mileage
+            {t('app.brand')}
           </span>
         </div>
 
@@ -713,13 +720,13 @@ function WorkspaceShell() {
                         : 'text-slate-400 dark:text-slate-500'
                     }`}
                   />
-                  {item.label}
+                  {t(item.labelKey)}
                 </span>
                 {item.id === 'log' &&
                   (autoDetector.phase === 'driving' ||
                     autoDetector.phase === 'parked_cooldown') && (
                     <span className="text-[11px] font-mono tabular-nums text-emerald-700 dark:text-emerald-400 font-semibold">
-                      Live
+                      {t('nav.live')}
                     </span>
                   )}
                 {item.id === 'log' &&
@@ -743,30 +750,62 @@ function WorkspaceShell() {
         {/* Quiet Ready Queue Summary */}
         {user && (
           <div className="mx-3 mb-3 px-3.5 py-3 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-lg space-y-1">
-            <div className="text-xs text-slate-500 dark:text-slate-400">Unsubmitted Queue</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400">{t('nav.queueTitle')}</div>
             <div className="flex items-baseline justify-between font-mono tabular-nums">
-              <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
+              <span dir="ltr" className="text-sm font-bold text-slate-900 dark:text-slate-100">
                 {formatCurrency(readyAmount)}
               </span>
               <span className="text-xs text-slate-500 dark:text-slate-400">
-                {readyTrips.length} {readyTrips.length === 1 ? 'trip' : 'trips'}
-                {readyExpenses.length > 0 ? ` · ${readyExpenses.length} exp` : ''}
+                {readyTrips.length}{' '}
+                {readyTrips.length === 1 ? t('nav.tripSingular') : t('nav.tripPlural')}
+                {readyExpenses.length > 0 ? ` · ${readyExpenses.length} ${t('nav.expShort')}` : ''}
               </span>
             </div>
             <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono tabular-nums">
-              Rate ${(profile?.ratePerMile ?? DEFAULT_RATE_PER_MILE).toFixed(2)}/mi
+              {t('nav.ratePerMile', {
+                rate: (profile?.ratePerMile ?? DEFAULT_RATE_PER_MILE).toFixed(2),
+              })}
             </div>
           </div>
         )}
+
+        {/* Language Switcher (EN / ES / עב) */}
+        <div className="px-3 pb-2">
+          <div
+            role="group"
+            aria-label={t('nav.languageAria')}
+            className="grid grid-cols-3 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg"
+          >
+            {LOCALE_OPTIONS.map((opt) => {
+              const active = locale === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setLocale(opt.value)}
+                  aria-pressed={active}
+                  title={opt.nativeLabel}
+                  className={`inline-flex items-center justify-center py-1.5 px-1.5 text-[11px] font-medium rounded-md transition-colors whitespace-nowrap ${
+                    active
+                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                  }`}
+                >
+                  {opt.nativeLabel}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         {/* Theme Switcher (Light / Dark / System) */}
         <div className="px-3 pb-3">
           <div
             role="group"
-            aria-label="Appearance theme"
+            aria-label={t('nav.themeAria')}
             className="grid grid-cols-3 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg"
           >
-            {THEME_OPTIONS.map(({ value, label, Icon }) => {
+            {THEME_OPTIONS.map(({ value, labelKey, Icon }) => {
               const active = themePreference === value;
               return (
                 <button
@@ -781,7 +820,7 @@ function WorkspaceShell() {
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5 shrink-0" />
-                  <span>{label}</span>
+                  <span>{t(labelKey)}</span>
                 </button>
               );
             })}
@@ -796,7 +835,7 @@ function WorkspaceShell() {
                 {user.photoURL ? (
                   <img
                     src={user.photoURL}
-                    alt={user.displayName ?? 'Employee'}
+                    alt={user.displayName ?? t('auth.employee')}
                     referrerPolicy="no-referrer"
                     className="w-8 h-8 rounded-full object-cover shrink-0 border border-slate-200 dark:border-slate-700"
                   />
@@ -807,7 +846,7 @@ function WorkspaceShell() {
                 )}
                 <div className="min-w-0">
                   <div className="text-xs font-semibold text-slate-900 dark:text-slate-100 truncate">
-                    {profile?.employeeName || user.displayName || 'Employee'}
+                    {profile?.employeeName || user.displayName || t('auth.employee')}
                   </div>
                   <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
                     {user.email}
@@ -817,8 +856,8 @@ function WorkspaceShell() {
               <button
                 type="button"
                 onClick={() => void handleSignOut()}
-                title="Sign out"
-                aria-label="Sign out"
+                title={t('auth.signOut')}
+                aria-label={t('auth.signOut')}
                 className="p-1.5 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-md transition-colors shrink-0"
               >
                 <LogOut className="w-4 h-4" />
@@ -831,7 +870,7 @@ function WorkspaceShell() {
               className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-slate-900 dark:text-slate-100 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap"
             >
               <LogIn className="w-3.5 h-3.5" />
-              Sign In to Sync Data
+              {t('auth.signInSyncData')}
             </button>
           )}
         </div>
@@ -844,15 +883,15 @@ function WorkspaceShell() {
             className="fixed inset-0 bg-slate-900/50 dark:bg-black/70"
             onClick={() => setMobileMenuOpen(false)}
           />
-          <div className="relative w-64 max-w-[80vw] bg-white dark:bg-slate-900 h-full flex flex-col border-r border-slate-200 dark:border-slate-800 z-10">
+          <div className="relative w-64 max-w-[80vw] bg-white dark:bg-slate-900 h-full flex flex-col border-e border-slate-200 dark:border-slate-800 z-10">
             <div className="h-16 px-4 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
               <span className="font-display text-base font-bold text-slate-900 dark:text-slate-100">
-                Curacao Mileage
+                {t('app.brand')}
               </span>
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen(false)}
-                aria-label="Close navigation"
+                aria-label={t('common.closeNavigation')}
                 className="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 rounded"
               >
                 <X className="w-5 h-5" />
@@ -877,20 +916,48 @@ function WorkspaceShell() {
                     }`}
                   >
                     <Icon className="w-4 h-4" />
-                    {item.label}
+                    {t(item.labelKey)}
                   </button>
                 );
               })}
             </nav>
 
+            {/* Mobile Language Switcher */}
+            <div className="px-3 pb-2">
+              <div
+                role="group"
+                aria-label={t('nav.languageAria')}
+                className="grid grid-cols-3 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg"
+              >
+                {LOCALE_OPTIONS.map((opt) => {
+                  const active = locale === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setLocale(opt.value)}
+                      aria-pressed={active}
+                      className={`inline-flex items-center justify-center py-1.5 px-1.5 text-[11px] font-medium rounded-md transition-colors whitespace-nowrap ${
+                        active
+                          ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                      }`}
+                    >
+                      {opt.nativeLabel}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Mobile Theme Switcher */}
             <div className="px-3 pb-3">
               <div
                 role="group"
-                aria-label="Appearance theme"
+                aria-label={t('nav.themeAria')}
                 className="grid grid-cols-3 gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg"
               >
-                {THEME_OPTIONS.map(({ value, label, Icon }) => {
+                {THEME_OPTIONS.map(({ value, labelKey, Icon }) => {
                   const active = themePreference === value;
                   return (
                     <button
@@ -905,7 +972,7 @@ function WorkspaceShell() {
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5 shrink-0" />
-                      <span>{label}</span>
+                      <span>{t(labelKey)}</span>
                     </button>
                   );
                 })}
@@ -923,7 +990,7 @@ function WorkspaceShell() {
                   className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 rounded-lg"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  Sign Out ({user.email})
+                  {t('auth.signOut')} ({user.email})
                 </button>
               ) : (
                 <button
@@ -935,7 +1002,7 @@ function WorkspaceShell() {
                   className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-white bg-blue-700 dark:bg-blue-600 rounded-lg"
                 >
                   <LogIn className="w-3.5 h-3.5" />
-                  Sign In with Google
+                  {t('auth.signInGoogle')}
                 </button>
               )}
             </div>
@@ -951,14 +1018,14 @@ function WorkspaceShell() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
-              aria-label="Open menu"
-              className="lg:hidden p-2 -ml-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg"
+              aria-label={t('common.openMenu')}
+              className="lg:hidden p-2 -ms-2 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white rounded-lg"
             >
               <Menu className="w-5 h-5" />
             </button>
             <div className="flex items-center gap-2 text-sm min-w-0">
               <span className="text-slate-400 dark:text-slate-500 hidden sm:inline whitespace-nowrap">
-                Los Angeles Retail
+                {t('app.region')}
               </span>
               <span
                 className="text-slate-300 dark:text-slate-700 hidden sm:inline"
@@ -967,22 +1034,50 @@ function WorkspaceShell() {
                 /
               </span>
               <h1 className="font-display font-semibold text-slate-900 dark:text-slate-100 truncate">
-                {currentNav.breadcrumb}
+                {t(currentNav.labelKey)}
               </h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Compact Mobile Language Switcher */}
+            <div
+              role="group"
+              aria-label={t('nav.languageAria')}
+              className="lg:hidden inline-flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800 rounded-lg"
+            >
+              <Globe className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 ms-1.5 me-0.5 hidden sm:inline shrink-0" />
+              {LOCALE_OPTIONS.map((opt) => {
+                const active = locale === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setLocale(opt.value)}
+                    aria-pressed={active}
+                    title={opt.nativeLabel}
+                    className={`px-1.5 py-1 text-[11px] font-semibold rounded-md transition-colors whitespace-nowrap ${
+                      active
+                        ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                    }`}
+                  >
+                    {opt.shortLabel}
+                  </button>
+                );
+              })}
+            </div>
+
             <button
               type="button"
               onClick={handlePrimaryHeaderCta}
               className="px-4 py-2 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg transition-colors whitespace-nowrap shrink-0"
             >
               {!user
-                ? 'Sign In to Sync'
+                ? t('auth.signInSync')
                 : readyTrips.length > 0
-                  ? `Generate Report (${readyTrips.length})`
-                  : 'Log New Trip'}
+                  ? t('header.generateReport', { count: readyTrips.length })
+                  : t('header.logNewTrip')}
             </button>
           </div>
         </header>
@@ -996,9 +1091,9 @@ function WorkspaceShell() {
             <button
               type="button"
               onClick={() => setAuthError(null)}
-              className="text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100 font-medium ml-4"
+              className="text-red-700 dark:text-red-300 hover:text-red-900 dark:hover:text-red-100 font-medium ms-4"
             >
-              Dismiss
+              {t('common.dismiss')}
             </button>
           </div>
         )}
@@ -1097,18 +1192,16 @@ function WorkspaceShell() {
 
         {/* Quiet Compliance Footer */}
         <footer className="no-print px-6 py-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center justify-between gap-2">
+          <span>{t('footer.tagline')}</span>
           <span>
-            Curacao Mileage · Built for Los Angeles retail travel &amp; reimbursement reporting.
-          </span>
-          <span>
-            Map data &amp; routing powered by Google Maps Platform (
+            {t('footer.mapsPrefix')}
             <a
               href="https://maps.google.com/help/terms_maps/?utm_campaign=gmp_mcp_codeassist_v1_aistudio"
               target="_blank"
               rel="noopener noreferrer"
               className="underline hover:text-slate-700 dark:hover:text-slate-200"
             >
-              End User Terms
+              {t('footer.endUserTerms')}
             </a>
             {' · '}
             <a
@@ -1117,10 +1210,9 @@ function WorkspaceShell() {
               rel="noopener noreferrer"
               className="underline hover:text-slate-700 dark:hover:text-slate-200"
             >
-              Google Privacy Policy
+              {t('footer.privacyPolicy')}
             </a>
-            ). Location tracking runs only when you press Start Drive, Use GPS, or enable
-            Auto-Detect Drives.
+            {t('footer.gpsNotice')}
           </span>
         </footer>
       </div>
@@ -1131,9 +1223,11 @@ function WorkspaceShell() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <APIProvider apiKey={MAPS_API_KEY} language="en" region="US">
-        <WorkspaceShell />
-      </APIProvider>
+      <I18nProvider>
+        <APIProvider apiKey={MAPS_API_KEY} language="en" region="US">
+          <WorkspaceShell />
+        </APIProvider>
+      </I18nProvider>
     </ErrorBoundary>
   );
 }

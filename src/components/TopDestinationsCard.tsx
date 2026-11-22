@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { MapPin } from 'lucide-react';
+import { useI18n } from '../lib/i18n';
 import {
   formatCurrency,
-  formatDisplayDate,
   round1,
   round2,
   type MileageTrip,
@@ -103,43 +103,45 @@ export function TopDestinationsCard({
   activeSearchQuery,
   onSelectDestination,
 }: TopDestinationsCardProps) {
+  const { t, tPurpose, formatLocalizedDate } = useI18n();
   const destinations = useMemo(() => analyzeTopDestinations(trips, 5), [trips]);
   const maxVisits = destinations[0]?.visitCount ?? 1;
+  const totalUniqueLocations = useMemo(
+    () =>
+      Object.keys(
+        trips.reduce<Record<string, boolean>>((acc, trip) => {
+          const k = trip.destinationPlaceId || trip.destinationName.trim().toLowerCase();
+          if (k) acc[k] = true;
+          return acc;
+        }, {})
+      ).length,
+    [trips]
+  );
 
   return (
     <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 sm:p-5 space-y-3.5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-            Top Trip Destinations
+            {t('dest.title')}
           </h2>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            Most frequently visited stops across all logged trips · Click a destination to filter
-            the ledger
+            {t('dest.subtitle')}
           </p>
         </div>
         {destinations.length > 0 && (
           <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
-            Showing top {destinations.length} of{' '}
-            {
-              Object.keys(
-                trips.reduce<Record<string, boolean>>((acc, t) => {
-                  const k = t.destinationPlaceId || t.destinationName.trim().toLowerCase();
-                  if (k) acc[k] = true;
-                  return acc;
-                }, {})
-              ).length
-            }{' '}
-            locations
+            {t('dest.showingTop', {
+              shown: destinations.length,
+              total: totalUniqueLocations,
+            })}
           </span>
         )}
       </div>
 
       {destinations.length === 0 ? (
         <div className="py-5 text-center border-t border-slate-100 dark:border-slate-800">
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Destination insights will appear automatically once you log your first trip.
-          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{t('dest.empty')}</p>
         </div>
       ) : (
         <div className="divide-y divide-slate-100 dark:divide-slate-800 border-t border-slate-100 dark:border-slate-800">
@@ -153,7 +155,7 @@ export function TopDestinationsCard({
                 key={dest.key}
                 type="button"
                 onClick={() => onSelectDestination(isFiltered ? '' : dest.name)}
-                className={`w-full text-left py-3 px-2 -mx-2 rounded-lg transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
+                className={`w-full text-start py-3 px-2 -mx-2 rounded-lg transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
                   isFiltered
                     ? 'bg-blue-50/70 dark:bg-blue-950/50'
                     : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
@@ -170,13 +172,13 @@ export function TopDestinationsCard({
                     </span>
                     {isFiltered && (
                       <span className="text-xs font-medium text-blue-700 dark:text-blue-400 shrink-0">
-                        · Filtered
+                        · {t('dest.filtered')}
                       </span>
                     )}
                   </div>
 
                   {/* Proportional Visit Share Bar */}
-                  <div className="pl-6 flex items-center gap-3">
+                  <div className="ps-6 flex items-center gap-3">
                     <div className="h-1.5 flex-1 max-w-xs bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                       <div
                         className="h-full bg-blue-700 dark:bg-blue-500 rounded-full"
@@ -184,25 +186,27 @@ export function TopDestinationsCard({
                       />
                     </div>
                     <span className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                      {dest.topPurpose} · Last {formatDisplayDate(dest.lastVisited)}
+                      {tPurpose(dest.topPurpose)} ·{' '}
+                      {t('dest.last', { date: formatLocalizedDate(dest.lastVisited) })}
                     </span>
                   </div>
                 </div>
 
-                <div className="pl-6 sm:pl-0 flex items-center gap-3 text-xs font-mono tabular-nums shrink-0">
+                <div className="ps-6 sm:ps-0 flex items-center gap-3 text-xs font-mono tabular-nums shrink-0">
                   <span className="font-semibold text-slate-900 dark:text-slate-100">
-                    {dest.visitCount} {dest.visitCount === 1 ? 'visit' : 'visits'}
+                    {dest.visitCount}{' '}
+                    {dest.visitCount === 1 ? t('dest.visitSingular') : t('dest.visitPlural')}
                   </span>
                   <span aria-hidden="true" className="text-slate-300 dark:text-slate-700">
                     ·
                   </span>
-                  <span className="text-slate-600 dark:text-slate-400">
-                    {dest.totalMiles.toFixed(1)} mi
+                  <span className="text-slate-600 dark:text-slate-400" dir="ltr">
+                    {dest.totalMiles.toFixed(1)} {t('common.mi')}
                   </span>
                   <span aria-hidden="true" className="text-slate-300 dark:text-slate-700">
                     ·
                   </span>
-                  <span className="font-semibold text-blue-800 dark:text-blue-400">
+                  <span className="font-semibold text-blue-800 dark:text-blue-400" dir="ltr">
                     {formatCurrency(dest.totalReimbursement)}
                   </span>
                 </div>
