@@ -9,20 +9,29 @@ import {
   YAxis,
 } from 'recharts';
 import { useI18n } from '../lib/i18n';
-import { formatCurrency, round1, round2, type MileageTrip } from '../types/mileage';
+import {
+  formatCurrency,
+  round1,
+  round2,
+  type MileageTrip,
+  type TripExpense,
+} from '../types/mileage';
 
 interface MonthlyBucket {
   monthIndex: number;
   month: string;
   submittedAmount: number;
   readyAmount: number;
+  expenseAmount: number;
   totalAmount: number;
   miles: number;
   tripCount: number;
+  expenseCount: number;
 }
 
 interface MonthlyReimbursementChartProps {
   trips: MileageTrip[];
+  expenses?: TripExpense[];
   year?: number;
   isDark?: boolean;
 }
@@ -41,44 +50,45 @@ function ChartTooltip({ active, payload, scope, year }: CustomTooltipProps) {
   if (!bucket) return null;
 
   const shownAmount =
-    scope === 'submitted' ? bucket.submittedAmount : bucket.totalAmount;
+    scope === 'submitted'
+      ? round2(bucket.submittedAmount + bucket.expenseAmount)
+      : bucket.totalAmount;
 
   return (
     <div
       dir={dir}
-      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-md px-3.5 py-2.5 text-xs space-y-1.5 min-w-[180px]"
+      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-md px-3.5 py-2.5 text-xs space-y-1.5 min-w-[200px]"
     >
       <div className="font-semibold text-slate-900 dark:text-slate-100">
         {bucket.month} {year}
       </div>
       <div className="space-y-1 font-mono tabular-nums">
-        {scope === 'all' ? (
-          <>
-            <div className="flex items-center justify-between gap-4 text-slate-700 dark:text-slate-300">
-              <span className="font-sans text-slate-500 dark:text-slate-400">
-                {tStage('submitted')}
-              </span>
-              <span dir="ltr">{formatCurrency(bucket.submittedAmount)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-4 text-slate-700 dark:text-slate-300">
-              <span className="font-sans text-slate-500 dark:text-slate-400">
-                {t('chart.readyQueue')}
-              </span>
-              <span dir="ltr">{formatCurrency(bucket.readyAmount)}</span>
-            </div>
-            <div className="pt-1 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4 font-semibold text-slate-900 dark:text-slate-100">
-              <span className="font-sans">{t('reports.total')}</span>
-              <span dir="ltr">{formatCurrency(shownAmount)}</span>
-            </div>
-          </>
-        ) : (
-          <div className="flex items-center justify-between gap-4 font-semibold text-slate-900 dark:text-slate-100">
-            <span className="font-sans text-slate-600 dark:text-slate-400 font-normal">
-              {tStage('submitted')}
+        <div className="flex items-center justify-between gap-4 text-slate-700 dark:text-slate-300">
+          <span className="font-sans text-slate-500 dark:text-slate-400">
+            {tStage('submitted')}
+          </span>
+          <span dir="ltr">{formatCurrency(bucket.submittedAmount)}</span>
+        </div>
+        {scope === 'all' && (
+          <div className="flex items-center justify-between gap-4 text-slate-700 dark:text-slate-300">
+            <span className="font-sans text-slate-500 dark:text-slate-400">
+              {t('chart.readyQueue')}
             </span>
-            <span dir="ltr">{formatCurrency(shownAmount)}</span>
+            <span dir="ltr">{formatCurrency(bucket.readyAmount)}</span>
           </div>
         )}
+        {bucket.expenseAmount > 0 && (
+          <div className="flex items-center justify-between gap-4 text-emerald-700 dark:text-emerald-400">
+            <span className="font-sans text-slate-500 dark:text-slate-400">
+              {t('nav.expShort')}
+            </span>
+            <span dir="ltr">{formatCurrency(bucket.expenseAmount)}</span>
+          </div>
+        )}
+        <div className="pt-1 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-4 font-semibold text-slate-900 dark:text-slate-100">
+          <span className="font-sans">{t('reports.total')}</span>
+          <span dir="ltr">{formatCurrency(shownAmount)}</span>
+        </div>
       </div>
       <div className="pt-1 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 font-mono tabular-nums">
         {bucket.tripCount}{' '}
@@ -86,6 +96,7 @@ function ChartTooltip({ active, payload, scope, year }: CustomTooltipProps) {
         <span dir="ltr">
           {bucket.miles.toFixed(1)} {t('common.mi')}
         </span>
+        {bucket.expenseCount > 0 ? ` · ${bucket.expenseCount} ${t('nav.expShort')}` : ''}
       </div>
     </div>
   );
@@ -93,21 +104,41 @@ function ChartTooltip({ active, payload, scope, year }: CustomTooltipProps) {
 
 export function MonthlyReimbursementChart({
   trips,
-  year = new Date().getFullYear(),
+  expenses = [],
+  year: initialYear = new Date().getFullYear(),
   isDark = false,
 }: MonthlyReimbursementChartProps) {
   const { t, tStage, monthLabels } = useI18n();
   const [scope, setScope] = useState<'all' | 'submitted'>('all');
 
-  const { data, ytdAmount, ytdMiles, peakMonth } = useMemo(() => {
+  // Collect all distinct years available in trips and expenses (always include initialYear)
+  const availableYears = useMemo(() => {
+    const years = new Set<number>([initialYear]);
+    for (const trip of trips) {
+      const yr = parseInt(trip.tripDate?.slice(0, 4) ?? '', 10);
+      if (Number.isFinite(yr) && yr >= 2000 && yr <= 2100) years.add(yr);
+    }
+    for (const exp of expenses) {
+      const yr = parseInt(exp.expenseDate?.slice(0, 4) ?? '', 10);
+      if (Number.isFinite(yr) && yr >= 2000 && yr <= 2100) years.add(yr);
+    }
+    return Array.from(years).sort((a, b) => b - a);
+  }, [trips, expenses, initialYear]);
+
+  const [selectedYear, setSelectedYear] = useState<number>(initialYear);
+  const year = availableYears.includes(selectedYear) ? selectedYear : availableYears[0] ?? initialYear;
+
+  const { data, ytdAmount, ytdMiles, ytdExpenses, peakMonth } = useMemo(() => {
     const buckets: MonthlyBucket[] = monthLabels.map((label, idx) => ({
       monthIndex: idx,
       month: label,
       submittedAmount: 0,
       readyAmount: 0,
+      expenseAmount: 0,
       totalAmount: 0,
       miles: 0,
       tripCount: 0,
+      expenseCount: 0,
     }));
 
     const yearPrefix = `${year}-`;
@@ -125,20 +156,42 @@ export function MonthlyReimbursementChart({
       } else {
         bucket.readyAmount = round2(bucket.readyAmount + trip.reimbursementAmount);
       }
-      bucket.totalAmount = round2(bucket.submittedAmount + bucket.readyAmount);
       bucket.miles = round1(bucket.miles + trip.billableMiles);
       bucket.tripCount += 1;
     }
 
+    for (const exp of expenses) {
+      if (!exp.expenseDate || !exp.expenseDate.startsWith(yearPrefix)) continue;
+      if (scope === 'submitted' && exp.status !== 'submitted') continue;
+
+      const monthNum = parseInt(exp.expenseDate.slice(5, 7), 10);
+      if (!Number.isFinite(monthNum) || monthNum < 1 || monthNum > 12) continue;
+
+      const bucket = buckets[monthNum - 1];
+      bucket.expenseAmount = round2(bucket.expenseAmount + exp.amount);
+      bucket.expenseCount += 1;
+    }
+
     let totalAmt = 0;
     let totalMi = 0;
+    let totalExp = 0;
     let peak: MonthlyBucket | null = null;
 
     for (const b of buckets) {
-      const amt = scope === 'submitted' ? b.submittedAmount : b.totalAmount;
+      b.totalAmount = round2(b.submittedAmount + b.readyAmount + b.expenseAmount);
+      const amt =
+        scope === 'submitted'
+          ? round2(b.submittedAmount + b.expenseAmount)
+          : b.totalAmount;
       totalAmt = round2(totalAmt + amt);
       totalMi = round1(totalMi + b.miles);
-      if (amt > 0 && (!peak || amt > (scope === 'submitted' ? peak.submittedAmount : peak.totalAmount))) {
+      totalExp = round2(totalExp + b.expenseAmount);
+      const peakAmt = peak
+        ? scope === 'submitted'
+          ? round2(peak.submittedAmount + peak.expenseAmount)
+          : peak.totalAmount
+        : 0;
+      if (amt > 0 && (!peak || amt > peakAmt)) {
         peak = b;
       }
     }
@@ -147,15 +200,19 @@ export function MonthlyReimbursementChart({
       data: buckets,
       ytdAmount: totalAmt,
       ytdMiles: totalMi,
+      ytdExpenses: totalExp,
       peakMonth: peak,
     };
-  }, [trips, year, scope, monthLabels]);
+  }, [trips, expenses, year, scope, monthLabels]);
 
   const gridStroke = isDark ? '#1e293b' : '#e2e8f0';
   const axisTickColor = isDark ? '#94a3b8' : '#64748b';
   const cursorFill = isDark ? 'rgba(30, 41, 59, 0.55)' : '#f1f5f9';
   const submittedBarFill = isDark ? '#3b82f6' : '#1d4ed8';
-  const readyBarFill = isDark ? '#93c5fd' : '#93c5fd';
+  const readyBarFill = '#93c5fd';
+  const expenseBarFill = isDark ? '#10b981' : '#059669';
+
+  const hasExpenses = ytdExpenses > 0;
 
   return (
     <section className="no-print bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
@@ -187,7 +244,7 @@ export function MonthlyReimbursementChart({
                   <span dir="ltr">
                     {formatCurrency(
                       scope === 'submitted'
-                        ? peakMonth.submittedAmount
+                        ? round2(peakMonth.submittedAmount + peakMonth.expenseAmount)
                         : peakMonth.totalAmount
                     )}
                   </span>
@@ -198,29 +255,46 @@ export function MonthlyReimbursementChart({
           </div>
         </div>
 
-        <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg self-start sm:self-auto shrink-0">
-          <button
-            type="button"
-            onClick={() => setScope('all')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
-              scope === 'all'
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-            }`}
-          >
-            {t('chart.allLogged')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setScope('submitted')}
-            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
-              scope === 'submitted'
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
-            }`}
-          >
-            {t('chart.submittedOnly')}
-          </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto shrink-0">
+          {availableYears.length > 1 && (
+            <select
+              aria-label="Year"
+              value={year}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              className="px-2.5 py-1.5 text-xs font-mono tabular-nums bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+            >
+              {availableYears.map((yr) => (
+                <option key={yr} value={yr}>
+                  {yr}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setScope('all')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
+                scope === 'all'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+            >
+              {t('chart.allLogged')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setScope('submitted')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap ${
+                scope === 'submitted'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+              }`}
+            >
+              {t('chart.submittedOnly')}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -260,7 +334,7 @@ export function MonthlyReimbursementChart({
               name={tStage('submitted')}
               stackId="reimbursement"
               fill={submittedBarFill}
-              radius={scope === 'submitted' ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+              radius={scope === 'submitted' && !hasExpenses ? [4, 4, 0, 0] : [0, 0, 0, 0]}
               maxBarSize={36}
             />
             {scope === 'all' && (
@@ -269,6 +343,16 @@ export function MonthlyReimbursementChart({
                 name={t('chart.readyQueue')}
                 stackId="reimbursement"
                 fill={readyBarFill}
+                radius={!hasExpenses ? [4, 4, 0, 0] : [0, 0, 0, 0]}
+                maxBarSize={36}
+              />
+            )}
+            {hasExpenses && (
+              <Bar
+                dataKey="expenseAmount"
+                name={t('nav.expShort')}
+                stackId="reimbursement"
+                fill={expenseBarFill}
                 radius={[4, 4, 0, 0]}
                 maxBarSize={36}
               />
@@ -287,7 +371,7 @@ export function MonthlyReimbursementChart({
 
       {/* Quiet Legend */}
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs text-slate-500 dark:text-slate-400">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <span className="inline-flex items-center gap-1.5">
             <span
               className="w-2.5 h-2.5 rounded-sm bg-blue-700 dark:bg-blue-500"
@@ -299,6 +383,15 @@ export function MonthlyReimbursementChart({
             <span className="inline-flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-sm bg-blue-300" aria-hidden="true" />
               {t('ledger.readyToSubmit')}
+            </span>
+          )}
+          {hasExpenses && (
+            <span className="inline-flex items-center gap-1.5">
+              <span
+                className="w-2.5 h-2.5 rounded-sm bg-emerald-600 dark:bg-emerald-500"
+                aria-hidden="true"
+              />
+              {t('nav.expShort')}
             </span>
           )}
         </div>

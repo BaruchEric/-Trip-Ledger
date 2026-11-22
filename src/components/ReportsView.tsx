@@ -261,7 +261,7 @@ export function ReportsView({
     <div className="space-y-5">
       {/* Current-Year Monthly Mileage Reimbursement Comparison Chart (hidden when printing a report) */}
       <div className="no-print">
-        <MonthlyReimbursementChart trips={trips} isDark={isDark} />
+        <MonthlyReimbursementChart trips={trips} expenses={expenses} isDark={isDark} />
       </div>
 
       {/* Unsubmitted Ready Queue Banner (hidden when printing) */}

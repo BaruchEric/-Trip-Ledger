@@ -417,9 +417,15 @@ export function TripLedgerView({
     setStatusFilter('all');
   };
 
-  const handleExportSelectedCsv = () => {
-    if (selectedTrips.length === 0) return;
-    downloadTripsCsv(selectedTrips);
+  const handleExportCsv = () => {
+    const targetTrips = selectedTrips.length > 0 ? selectedTrips : filteredTrips;
+    if (targetTrips.length === 0) return;
+    downloadTripsCsv(targetTrips, {
+      filenamePrefix:
+        selectedTrips.length > 0 ? 'MileTrack_Selected_Trips' : 'MileTrack_Filtered_Trips',
+      reportById,
+      expensesByTripId,
+    });
   };
 
   const handleDownloadTripPdf = (trip: MileageTrip) => {
@@ -899,14 +905,16 @@ export function TripLedgerView({
               </button>
               <button
                 type="button"
-                disabled={selectedTrips.length === 0}
-                onClick={handleExportSelectedCsv}
+                disabled={selectedTrips.length === 0 && filteredTrips.length === 0}
+                onClick={handleExportCsv}
                 className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-45 disabled:cursor-not-allowed rounded-lg transition-colors whitespace-nowrap shrink-0"
               >
                 <Download className="w-3.5 h-3.5 text-slate-600 dark:text-slate-300" />
                 {selectedTrips.length > 0
                   ? t('ledger.exportCsvCount', { count: selectedTrips.length })
-                  : t('ledger.exportCsv')}
+                  : filteredTrips.length > 0
+                    ? t('ledger.exportCsvCount', { count: filteredTrips.length })
+                    : t('ledger.exportCsv')}
               </button>
             </div>
           </div>

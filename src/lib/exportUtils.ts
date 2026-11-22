@@ -98,7 +98,9 @@ export function downloadReportCsv(
     ...expenseSection,
   ];
 
-  const blob = new Blob([csvLines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csvLines.join('\r\n')], {
+    type: 'text/csv;charset=utf-8;',
+  });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -109,12 +111,30 @@ export function downloadReportCsv(
   URL.revokeObjectURL(url);
 }
 
-export function downloadTripsCsv(trips: MileageTrip[]) {
+export interface DownloadTripsCsvOptions {
+  filenamePrefix?: string;
+  reportById?: Record<string, MileageReport>;
+  expensesByTripId?: Record<string, TripExpense[]>;
+}
+
+export function downloadTripsCsv(
+  trips: MileageTrip[],
+  options: DownloadTripsCsvOptions = {}
+) {
   if (trips.length === 0) return;
+
+  const {
+    filenamePrefix = 'MileTrack_Trips',
+    reportById = {},
+    expensesByTripId = {},
+  } = options;
 
   const sorted = [...trips].sort((a, b) => a.tripDate.localeCompare(b.tripDate));
   const totalMiles = sorted.reduce((sum, t) => sum + t.billableMiles, 0);
-  const totalAmount = sorted.reduce((sum, t) => sum + t.reimbursementAmount, 0);
+  const totalMileageAmount = round2(
+    sorted.reduce((sum, t) => sum + t.reimbursementAmount, 0)
+  );
+  let totalLinkedExpenses = 0;
   const today = new Date().toISOString().slice(0, 10);
 
   const columns = [
@@ -129,29 +149,51 @@ export function downloadTripsCsv(trips: MileageTrip[]) {
     'Commute Deduction (mi)',
     'Billable Miles',
     'Rate ($/mi)',
-    'Reimbursement ($)',
+    'Mileage Reimbursement ($)',
+    'Linked Expenses ($)',
+    'Total ($)',
     'Status',
+    'Report Number',
     'Capture Method',
     'Notes',
   ];
 
-  const rows = sorted.map((t) => [
-    t.tripDate,
-    t.originName,
-    t.originAddress,
-    t.destinationName,
-    t.destinationAddress,
-    t.purpose,
-    t.isRoundTrip ? 'Round Trip' : 'One-Way',
-    t.oneWayMiles.toFixed(1),
-    t.commuteDeductionMiles.toFixed(1),
-    t.billableMiles.toFixed(1),
-    t.ratePerMile.toFixed(3),
-    t.reimbursementAmount.toFixed(2),
-    t.status === 'submitted' ? 'Submitted' : 'Ready',
-    t.captureMethod,
-    t.notes,
-  ]);
+  const rows = sorted.map((t) => {
+    const linkedExps = expensesByTripId[t.id] ?? [];
+    const expSum = round2(linkedExps.reduce((s, e) => s + e.amount, 0));
+    totalLinkedExpenses = round2(totalLinkedExpenses + expSum);
+    const rowTotal = round2(t.reimbursementAmount + expSum);
+    const linkedReport = t.reportId ? reportById[t.reportId] : undefined;
+    const statusLabel =
+      linkedReport?.status === 'reimbursed'
+        ? 'Reimbursed'
+        : t.status === 'submitted'
+          ? 'Submitted'
+          : 'Ready';
+
+    return [
+      t.tripDate,
+      t.originName,
+      t.originAddress,
+      t.destinationName,
+      t.destinationAddress,
+      t.purpose,
+      t.isRoundTrip ? 'Round Trip' : 'One-Way',
+      t.oneWayMiles.toFixed(1),
+      t.commuteDeductionMiles.toFixed(1),
+      t.billableMiles.toFixed(1),
+      t.ratePerMile.toFixed(3),
+      t.reimbursementAmount.toFixed(2),
+      expSum.toFixed(2),
+      rowTotal.toFixed(2),
+      statusLabel,
+      linkedReport?.reportNumber ?? '',
+      t.captureMethod,
+      t.notes,
+    ];
+  });
+
+  const grandTotal = round2(totalMileageAmount + totalLinkedExpenses);
 
   const totalsRow = [
     'TOTAL',
@@ -165,7 +207,10 @@ export function downloadTripsCsv(trips: MileageTrip[]) {
     '',
     totalMiles.toFixed(1),
     '',
-    totalAmount.toFixed(2),
+    totalMileageAmount.toFixed(2),
+    totalLinkedExpenses.toFixed(2),
+    grandTotal.toFixed(2),
+    '',
     '',
     '',
     '',
@@ -177,11 +222,13 @@ export function downloadTripsCsv(trips: MileageTrip[]) {
     totalsRow.map(escapeCsvCell).join(','),
   ];
 
-  const blob = new Blob([csvLines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csvLines.join('\r\n')], {
+    type: 'text/csv;charset=utf-8;',
+  });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `MileTrack_Trips_${today}.csv`;
+  link.download = `${filenamePrefix}_${today}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
