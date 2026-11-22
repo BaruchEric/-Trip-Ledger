@@ -1,4 +1,5 @@
 import type { PlaceSelection } from '../types/mileage';
+import { GOOGLE_MAPS_API_KEY } from './env';
 
 const STATIC_MAPS_BASE_URL = 'https://maps.googleapis.com/maps/api/staticmap';
 
@@ -66,7 +67,7 @@ export interface RouteStaticMapOptions {
  * Docs: https://developers.google.com/maps/documentation/maps-static/overview?utm_campaign=gmp_mcp_codeassist_v1_aistudio
  */
 export function buildRouteStaticMapUrl(options: RouteStaticMapOptions): string {
-  const apiKey = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined) ?? '';
+  const apiKey = GOOGLE_MAPS_API_KEY;
   if (!apiKey) return '';
 
   const originLoc = formatStaticLocation(options.origin);

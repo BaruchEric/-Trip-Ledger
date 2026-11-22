@@ -6,7 +6,14 @@ import {
   signOut as firebaseSignOut,
 } from 'firebase/auth';
 import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
+import firebaseConfigJson from '../../firebase-applet-config.json';
+import { getFirebaseEnvOverrides } from './env';
+
+const firebaseEnvOverrides = getFirebaseEnvOverrides();
+const firebaseConfig = {
+  ...firebaseConfigJson,
+  ...firebaseEnvOverrides,
+};
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);

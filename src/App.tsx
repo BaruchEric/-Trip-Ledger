@@ -77,7 +77,9 @@ import {
   type UserProfile,
 } from './types/mileage';
 
-const MAPS_API_KEY = (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined) ?? '';
+import { GOOGLE_MAPS_API_KEY } from './lib/env';
+
+const MAPS_API_KEY = GOOGLE_MAPS_API_KEY;
 
 const NAV_ITEMS: Array<{
   id: ActiveView;
