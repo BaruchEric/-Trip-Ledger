@@ -44,8 +44,9 @@ export const STOP_COOLDOWN_PRESETS = [
 ] as const;
 export const MIN_TRIP_MILES_PRESETS = [0.2, 0.3, 0.5] as const;
 
-const SETTINGS_STORAGE_KEY = 'curacao_auto_drive_settings_v1';
-const PENDING_DRIVES_SESSION_KEY = 'curacao_detected_drives_session_v1';
+const SETTINGS_STORAGE_KEY = 'miletrack_auto_drive_settings_v1';
+const LEGACY_SETTINGS_STORAGE_KEY = 'curacao_auto_drive_settings_v1';
+const PENDING_DRIVES_SESSION_KEY = 'miletrack_detected_drives_session_v1';
 
 export const MPS_TO_MPH = 2.23693629;
 export const MAX_PLAUSIBLE_SPEED_MPH = 110;
@@ -54,7 +55,9 @@ export const PARKED_SPEED_THRESHOLD_MPH = 3.5;
 
 export function loadAutoDriveSettings(): AutoDriveSettings {
   try {
-    const raw = window.localStorage.getItem(SETTINGS_STORAGE_KEY);
+    const raw =
+      window.localStorage.getItem(SETTINGS_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_SETTINGS_STORAGE_KEY);
     if (!raw) return DEFAULT_AUTO_DRIVE_SETTINGS;
     const parsed = JSON.parse(raw) as Partial<AutoDriveSettings>;
     return {
@@ -139,9 +142,9 @@ export function computeSampleSpeedMph(
 }
 
 /**
- * Generates realistic GPS motion samples between two dynamically discovered
- * Curacao store locations so users can preview the automated driving state
- * machine (Monitoring -> Driving -> Parked Cooldown -> Auto-Captured) from a desk.
+ * Generates realistic GPS motion samples between two saved locations so users
+ * can preview the automated driving state machine (Monitoring -> Driving ->
+ * Parked Cooldown -> Auto-Captured) from a desk.
  */
 export function buildSimulatedDriveSamples(
   fromStore: StoreLocation,

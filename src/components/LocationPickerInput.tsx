@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useMapsLibrary } from '@vis.gl/react-google-maps';
-import { Building2, LocateFixed, MapPin, Search, X } from 'lucide-react';
+import { Building2, CornerDownLeft, LocateFixed, MapPin, Plus, Search, X } from 'lucide-react';
 import { useAutocompleteSuggestions } from '../hooks/useAutocompleteSuggestions';
 import { useI18n } from '../lib/i18n';
 import type { PlaceSelection, StoreLocation } from '../types/mileage';
@@ -13,6 +13,8 @@ interface LocationPickerInputProps {
   onChange: (place: PlaceSelection | null) => void;
   stores: StoreLocation[];
   homeStorePlaceId?: string;
+  biasCenter?: google.maps.LatLngLiteral | null;
+  onManageLocations?: () => void;
   findNearestStore: (
     lat: number,
     lng: number,
@@ -29,10 +31,12 @@ export function LocationPickerInput({
   onChange,
   stores,
   homeStorePlaceId,
+  biasCenter,
+  onManageLocations,
   findNearestStore,
   accentDotColor,
 }: LocationPickerInputProps) {
-  const { t } = useI18n();
+  const { t, tLocationCategory } = useI18n();
   const placesLib = useMapsLibrary('places');
   const [inputText, setInputText] = useState(value?.name ?? '');
   const [isOpen, setIsOpen] = useState(false);
@@ -59,33 +63,38 @@ export function LocationPickerInput({
   const queryForAutocomplete = isOpen && inputText !== value?.name ? inputText : '';
   const { suggestions, isLoading, resetSession } = useAutocompleteSuggestions(
     queryForAutocomplete,
-    isOpen
+    isOpen,
+    biasCenter
   );
 
-  // Filter live-discovered Curacao LA stores by input text
+  // Filter user's saved locations by input text
   const normalizedQuery = inputText.trim().toLowerCase();
   const matchingStores = stores
     .filter((s) => {
       if (!normalizedQuery || inputText === value?.name) return true;
       return (
         s.shortName.toLowerCase().includes(normalizedQuery) ||
-        s.address.toLowerCase().includes(normalizedQuery)
+        s.address.toLowerCase().includes(normalizedQuery) ||
+        (s.category && s.category.toLowerCase().includes(normalizedQuery))
       );
     })
     .sort((a, b) => {
-      if (a.placeId === homeStorePlaceId) return -1;
-      if (b.placeId === homeStorePlaceId) return 1;
+      const aHome = a.isHome || (homeStorePlaceId && a.placeId === homeStorePlaceId);
+      const bHome = b.isHome || (homeStorePlaceId && b.placeId === homeStorePlaceId);
+      if (aHome && !bHome) return -1;
+      if (!aHome && bHome) return 1;
       return 0;
     });
 
   const handleSelectStore = useCallback(
     (store: StoreLocation) => {
+      const hasCoords = store.hasCoordinates !== false;
       onChange({
         name: store.shortName,
         address: store.address,
         placeId: store.placeId,
-        lat: store.lat,
-        lng: store.lng,
+        lat: hasCoords ? store.lat : undefined,
+        lng: hasCoords ? store.lng : undefined,
       });
       setInputText(store.shortName);
       setIsOpen(false);
@@ -94,6 +103,20 @@ export function LocationPickerInput({
     },
     [onChange, resetSession]
   );
+
+  const handleSelectCustomTyped = useCallback(() => {
+    const trimmed = inputText.trim();
+    if (!trimmed) return;
+    onChange({
+      name: trimmed,
+      address: trimmed,
+      placeId: '',
+    });
+    setInputText(trimmed);
+    setIsOpen(false);
+    setLocError(null);
+    resetSession();
+  }, [inputText, onChange, resetSession]);
 
   const handleSelectSuggestion = useCallback(
     async (suggestion: google.maps.places.AutocompleteSuggestion) => {
@@ -171,6 +194,9 @@ export function LocationPickerInput({
     );
   }, [findNearestStore, handleSelectStore, onChange]);
 
+  const showCustomTypedOption =
+    inputText.trim().length >= 2 && inputText.trim() !== (value?.name ?? '').trim();
+
   return (
     <div ref={containerRef} className="relative">
       <div className="flex items-center justify-between mb-1.5">
@@ -206,6 +232,12 @@ export function LocationPickerInput({
           autoComplete="off"
           placeholder={placeholder}
           onFocus={() => setIsOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && isOpen && showCustomTypedOption && suggestions.length === 0) {
+              e.preventDefault();
+              handleSelectCustomTyped();
+            }
+          }}
           onChange={(e) => {
             setInputText(e.target.value);
             setIsOpen(true);
@@ -244,39 +276,76 @@ export function LocationPickerInput({
 
       {isOpen && (
         <div className="absolute z-30 inset-x-0 mt-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-72 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
-          {/* Discovered Curacao LA Stores */}
-          {matchingStores.length > 0 && (
+          {/* User's Saved Locations */}
+          {matchingStores.length > 0 ? (
             <div className="py-1.5">
-              <div className="px-3 py-1 text-xs font-medium text-slate-500 dark:text-slate-400">
-                {t('loc.curacaoStores')}
+              <div className="px-3 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center justify-between gap-2">
+                <span>{t('loc.savedLocations')}</span>
+                {onManageLocations && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOpen(false);
+                      onManageLocations();
+                    }}
+                    className="text-blue-700 dark:text-blue-400 hover:underline font-medium whitespace-nowrap"
+                  >
+                    {t('loc.manageLocations')}
+                  </button>
+                )}
               </div>
-              {matchingStores.map((store) => (
-                <button
-                  key={store.placeId}
-                  type="button"
-                  onClick={() => handleSelectStore(store)}
-                  className="w-full px-3 py-2 text-start hover:bg-slate-50 dark:hover:bg-slate-800 flex items-start gap-2.5 transition-colors"
-                >
-                  <Building2 className="w-4 h-4 text-blue-700 dark:text-blue-400 mt-0.5 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
-                      <span className="truncate">{store.shortName}</span>
-                      {store.placeId === homeStorePlaceId && (
-                        <span className="text-xs font-medium text-blue-700 dark:text-blue-400 shrink-0">
-                          · {t('loc.homeStore')}
-                        </span>
-                      )}
+              {matchingStores.map((store) => {
+                const isHome = store.isHome || (homeStorePlaceId && store.placeId === homeStorePlaceId);
+                return (
+                  <button
+                    key={store.id ?? store.placeId}
+                    type="button"
+                    onClick={() => handleSelectStore(store)}
+                    className="w-full px-3 py-2 text-start hover:bg-slate-50 dark:hover:bg-slate-800 flex items-start gap-2.5 transition-colors"
+                  >
+                    <Building2 className="w-4 h-4 text-blue-700 dark:text-blue-400 mt-0.5 shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-100">
+                        <span className="truncate">{store.shortName}</span>
+                        {store.category && (
+                          <span className="text-[11px] font-normal text-slate-500 dark:text-slate-400 shrink-0">
+                            {tLocationCategory(store.category)}
+                          </span>
+                        )}
+                        {isHome && (
+                          <span className="text-xs font-medium text-blue-700 dark:text-blue-400 shrink-0">
+                            · {t('loc.homeLocation')}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                        {store.address}
+                      </p>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                      {store.address}
-                    </p>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
-          )}
+          ) : stores.length === 0 && !normalizedQuery ? (
+            <div className="px-3 py-2.5 space-y-2">
+              <p className="text-xs text-slate-500 dark:text-slate-400">{t('loc.noSavedYet')}</p>
+              {onManageLocations && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsOpen(false);
+                    onManageLocations();
+                  }}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700 dark:text-blue-400 hover:underline"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {t('loc.addLocationLink')}
+                </button>
+              )}
+            </div>
+          ) : null}
 
-          {/* Live Google Places Autocomplete Results */}
+          {/* Live Global Google Places Autocomplete Results */}
           {queryForAutocomplete.trim().length >= 2 && (
             <div className="py-1.5">
               <div className="px-3 py-1 text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center justify-between">
@@ -315,6 +384,22 @@ export function LocationPickerInput({
                   );
                 })
               )}
+            </div>
+          )}
+
+          {/* Direct manual address / custom label option */}
+          {showCustomTypedOption && (
+            <div className="py-1.5">
+              <button
+                type="button"
+                onClick={handleSelectCustomTyped}
+                className="w-full px-3 py-2 text-start hover:bg-blue-50/70 dark:hover:bg-blue-950/40 flex items-center gap-2.5 transition-colors text-xs font-medium text-blue-700 dark:text-blue-400"
+              >
+                <CornerDownLeft className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">
+                  {t('loc.useTypedAddress', { text: inputText.trim() })}
+                </span>
+              </button>
             </div>
           )}
         </div>

@@ -26,7 +26,7 @@ import {
   type TripExpense,
 } from '../types/mileage';
 
-const LA_DEFAULT_CENTER = { lat: 34.0407, lng: -118.2468 };
+const FALLBACK_MAP_CENTER = { lat: 39.8283, lng: -98.5795 };
 const MAX_ALL_ROAD_LEGS = 8;
 
 interface LedgerMapViewModalProps {
@@ -378,9 +378,9 @@ export function LedgerMapViewModal({
       address: string,
       name: string
     ): Promise<google.maps.LatLngLiteral | null> => {
-      // 1. Match known Curacao LA stores by placeId (zero API calls)
+      // 1. Match saved locations by placeId (zero API calls)
       if (placeId) {
-        const matched = stores.find((s) => s.placeId === placeId);
+        const matched = stores.find((s) => s.placeId === placeId && s.hasCoordinates !== false);
         if (matched) return { lat: matched.lat, lng: matched.lng };
       }
 
@@ -388,13 +388,14 @@ export function LedgerMapViewModal({
       const parsedCoords = parseCoordinateString(address);
       if (parsedCoords) return parsedCoords;
 
-      // 3. Match known Curacao LA stores by name (zero API calls)
+      // 3. Match saved locations by name (zero API calls)
       const lowerName = name.trim().toLowerCase();
       if (lowerName) {
         const matchedByName = stores.find(
           (s) =>
-            s.shortName.toLowerCase() === lowerName ||
-            s.name.toLowerCase() === lowerName
+            s.hasCoordinates !== false &&
+            (s.shortName.toLowerCase() === lowerName ||
+              s.name.toLowerCase() === lowerName)
         );
         if (matchedByName) return { lat: matchedByName.lat, lng: matchedByName.lng };
       }
@@ -897,7 +898,12 @@ export function LedgerMapViewModal({
         <div className="relative flex-1 min-h-[340px] lg:min-h-0 w-full h-full bg-slate-100 dark:bg-slate-950">
           <GoogleMap
             mapId="DEMO_MAP_ID"
-            defaultCenter={LA_DEFAULT_CENTER}
+            defaultCenter={(() => {
+              const firstMappable = stores.find((s) => s.hasCoordinates !== false);
+              return firstMappable
+                ? { lat: firstMappable.lat, lng: firstMappable.lng }
+                : FALLBACK_MAP_CENTER;
+            })()}
             defaultZoom={10}
             gestureHandling="greedy"
             streetViewControl={false}

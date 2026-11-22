@@ -13,7 +13,24 @@ export type CaptureMethod = 'route_auto' | 'gps_live' | 'template' | 'manual';
 
 export type TripStatus = 'ready' | 'submitted';
 export type ReportStatus = 'submitted' | 'reimbursed';
-export type ActiveView = 'log' | 'ledger' | 'reports' | 'settings';
+export type ActiveView = 'log' | 'locations' | 'ledger' | 'reports' | 'settings';
+
+export type LocationCategory =
+  | 'Office'
+  | 'Client'
+  | 'Branch'
+  | 'Warehouse'
+  | 'Home'
+  | 'Other';
+
+export const LOCATION_CATEGORIES: LocationCategory[] = [
+  'Office',
+  'Client',
+  'Branch',
+  'Warehouse',
+  'Home',
+  'Other',
+];
 
 export const TRIP_PURPOSES: TripPurpose[] = [
   'Inter-Store Transfer',
@@ -64,7 +81,39 @@ export const FIELD_LIMITS = {
   expenseDescription: 160,
   templateLabel: 100,
   reportNumber: 40,
+  locationName: 120,
+  locationAddress: 240,
+  locationNotes: 200,
+  placeId: 160,
 } as const;
+
+export interface SavedLocation {
+  id: string;
+  userId: string;
+  name: string;
+  address: string;
+  placeId: string;
+  category: LocationCategory;
+  lat: number;
+  lng: number;
+  hasCoordinates: boolean;
+  isHome: boolean;
+  notes: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export interface SavedLocationInput {
+  name: string;
+  address: string;
+  placeId: string;
+  category: LocationCategory;
+  lat: number;
+  lng: number;
+  hasCoordinates: boolean;
+  isHome: boolean;
+  notes: string;
+}
 
 export interface UserProfile {
   uid: string;
@@ -168,14 +217,19 @@ export interface NewExpenseInput {
   notes: string;
 }
 
-// Ephemeral session-only geospatial objects from Google Maps Places API (New)
+// Unified location projection used across maps, route pickers, and GPS snapping
 export interface StoreLocation {
+  id?: string;
   placeId: string;
   name: string;
   shortName: string;
   address: string;
   lat: number;
   lng: number;
+  hasCoordinates?: boolean;
+  category?: LocationCategory;
+  isHome?: boolean;
+  notes?: string;
   businessStatus?: string;
 }
 

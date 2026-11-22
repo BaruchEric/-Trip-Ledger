@@ -1,14 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMapsLibrary } from '@vis.gl/react-google-maps';
 
-// Greater Los Angeles bounding box bias for Curacao retail travel
-const LA_LOCATION_BIAS: google.maps.LatLngBoundsLiteral = {
-  south: 33.6,
-  west: -118.85,
-  north: 34.45,
-  east: -117.15,
-};
-
 export interface UseAutocompleteSuggestionsReturn {
   suggestions: google.maps.places.AutocompleteSuggestion[];
   isLoading: boolean;
@@ -17,12 +9,14 @@ export interface UseAutocompleteSuggestionsReturn {
 }
 
 /**
- * Modern Places API (New) autocomplete hook using AutocompleteSuggestion
- * and session tokens for cost-optimized address & place search.
+ * Modern Places API (New) global autocomplete hook using AutocompleteSuggestion
+ * and session tokens for cost-optimized address & place search anywhere in the world.
+ * Optionally biases results around the user's primary saved location without hard-restricting region.
  */
 export function useAutocompleteSuggestions(
   inputString: string,
-  enabled: boolean = true
+  enabled: boolean = true,
+  biasCenter?: google.maps.LatLngLiteral | null
 ): UseAutocompleteSuggestionsReturn {
   const placesLib = useMapsLibrary('places');
   const sessionTokenRef =
@@ -33,6 +27,9 @@ export function useAutocompleteSuggestions(
   >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const biasLat = biasCenter?.lat ?? null;
+  const biasLng = biasCenter?.lng ?? null;
 
   useEffect(() => {
     if (!placesLib || !enabled) return;
@@ -59,10 +56,15 @@ export function useAutocompleteSuggestions(
       const request: google.maps.places.AutocompleteRequest = {
         input: trimmed,
         sessionToken: sessionTokenRef.current ?? undefined,
-        locationBias: LA_LOCATION_BIAS,
-        includedRegionCodes: ['us'],
-        language: 'en-US',
       };
+
+      if (biasLat !== null && biasLng !== null) {
+        // Soft ~50 km radius bias around the user's primary location (does not exclude global results)
+        request.locationBias = {
+          center: { lat: biasLat, lng: biasLng },
+          radius: 50000,
+        };
+      }
 
       AutocompleteSuggestion.fetchAutocompleteSuggestions(request)
         .then((res) => {
@@ -83,7 +85,7 @@ export function useAutocompleteSuggestions(
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [placesLib, inputString, enabled]);
+  }, [placesLib, inputString, enabled, biasLat, biasLng]);
 
   const resetSession = useCallback(() => {
     sessionTokenRef.current = null;

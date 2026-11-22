@@ -41,27 +41,27 @@ const CATEGORY_META: Record<
   }
 > = {
   Parking: {
-    placeholder: 'e.g., DTLA Parking Structure or Metered Lot',
+    placeholder: 'e.g., Downtown Parking Garage or Metered Lot',
     Icon: ParkingCircle,
   },
   Tolls: {
-    placeholder: 'e.g., Bridge Toll or Toll Road Charge',
+    placeholder: 'e.g., Bridge Toll or Highway Toll Charge',
     Icon: Route,
   },
   'Express Lane': {
-    placeholder: 'e.g., I-110 / I-10 Metro ExpressLanes FasTrak',
+    placeholder: 'e.g., Express Lane / Toll Pass Transponder',
     Icon: Car,
   },
   'Fuel / Gas': {
-    placeholder: 'e.g., Chevron / Shell Fuel Stop or EV Charging',
+    placeholder: 'e.g., Fuel Stop or EV Charging Station',
     Icon: Fuel,
   },
   Supplies: {
-    placeholder: 'e.g., Store Transfer Packing Tape or Office Supplies',
+    placeholder: 'e.g., Packing Tape or Office Supplies',
     Icon: Package,
   },
   Other: {
-    placeholder: 'e.g., Car Wash, Courier Fee, or Store Errand Receipt',
+    placeholder: 'e.g., Car Wash, Courier Fee, or Misc Receipt',
     Icon: Tag,
   },
 };

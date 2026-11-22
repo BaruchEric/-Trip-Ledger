@@ -1,12 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Save } from 'lucide-react';
 import { useI18n } from '../lib/i18n';
 import {
   DEFAULT_RATE_PER_MILE,
   FIELD_LIMITS,
+  type PlaceSelection,
   type StoreLocation,
   type UserProfile,
 } from '../types/mileage';
+import { LocationPickerInput } from './LocationPickerInput';
 
 export interface ProfileSettingsInput {
   employeeName: string;
@@ -27,7 +29,13 @@ interface ProfileSettingsViewProps {
   userDisplayName: string;
   profile: UserProfile | null;
   stores: StoreLocation[];
-  storesLoading: boolean;
+  biasCenter?: google.maps.LatLngLiteral | null;
+  findNearestStore: (
+    lat: number,
+    lng: number,
+    maxMiles?: number
+  ) => { store: StoreLocation; distanceMiles: number } | null;
+  onManageLocations?: () => void;
   onSaveProfile: (input: ProfileSettingsInput) => Promise<void>;
 }
 
@@ -43,13 +51,15 @@ export function ProfileSettingsView({
   userDisplayName,
   profile,
   stores,
-  storesLoading,
+  biasCenter,
+  findNearestStore,
+  onManageLocations,
   onSaveProfile,
 }: ProfileSettingsViewProps) {
   const { t } = useI18n();
   const [employeeName, setEmployeeName] = useState(profile?.employeeName ?? userDisplayName);
   const [employeeId, setEmployeeId] = useState(profile?.employeeId ?? '');
-  const [department, setDepartment] = useState(profile?.department ?? 'Retail Operations');
+  const [department, setDepartment] = useState(profile?.department ?? '');
   const [managerEmail, setManagerEmail] = useState(profile?.managerEmail ?? '');
   const [homeStorePlaceId, setHomeStorePlaceId] = useState(profile?.homeStorePlaceId ?? '');
   const [homeStoreName, setHomeStoreName] = useState(profile?.homeStoreName ?? '');
@@ -81,16 +91,30 @@ export function ProfileSettingsView({
     setNormalCommuteMiles(profile.normalCommuteMiles);
   }, [profile, userDisplayName]);
 
-  const handleSelectHomeStore = (placeId: string) => {
-    setHomeStorePlaceId(placeId);
-    const matched = stores.find((s) => s.placeId === placeId);
-    if (matched) {
-      setHomeStoreName(matched.shortName);
-      setHomeStoreAddress(matched.address);
-    } else {
+  const homePlaceSelection = useMemo<PlaceSelection | null>(() => {
+    if (!homeStoreName && !homeStoreAddress) return null;
+    const matched = stores.find(
+      (s) => homeStorePlaceId && s.placeId === homeStorePlaceId
+    );
+    return {
+      name: homeStoreName || homeStoreAddress,
+      address: homeStoreAddress,
+      placeId: homeStorePlaceId,
+      lat: matched && matched.hasCoordinates !== false ? matched.lat : undefined,
+      lng: matched && matched.hasCoordinates !== false ? matched.lng : undefined,
+    };
+  }, [homeStoreName, homeStoreAddress, homeStorePlaceId, stores]);
+
+  const handleSelectHomePlace = (place: PlaceSelection | null) => {
+    if (!place) {
+      setHomeStorePlaceId('');
       setHomeStoreName('');
       setHomeStoreAddress('');
+      return;
     }
+    setHomeStorePlaceId(place.placeId);
+    setHomeStoreName(place.name);
+    setHomeStoreAddress(place.address);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -201,7 +225,7 @@ export function ProfileSettingsView({
                 maxLength={FIELD_LIMITS.employeeId}
                 value={employeeId}
                 onChange={(e) => setEmployeeId(e.target.value)}
-                placeholder="CUR-10482"
+                placeholder="EMP-10482"
                 className="w-full px-3 py-2 text-sm font-mono bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
               />
             </div>
@@ -238,14 +262,14 @@ export function ProfileSettingsView({
                 maxLength={FIELD_LIMITS.managerEmail}
                 value={managerEmail}
                 onChange={(e) => setManagerEmail(e.target.value)}
-                placeholder="manager@icuracao.com"
+                placeholder="manager@company.com"
                 className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
               />
             </div>
           </div>
         </div>
 
-        {/* Home Store & Vehicle */}
+        {/* Primary Location & Vehicle */}
         <div className="p-6 space-y-4">
           <div>
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
@@ -256,35 +280,20 @@ export function ProfileSettingsView({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label
-                htmlFor="prof-store"
-                className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1.5"
-              >
-                {t('settings.primaryStore')}
-              </label>
-              <select
-                id="prof-store"
-                value={homeStorePlaceId}
-                onChange={(e) => handleSelectHomeStore(e.target.value)}
-                className="w-full px-3 py-2 text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
-              >
-                <option value="">
-                  {storesLoading ? t('settings.loadingStores') : t('settings.selectHomeStore')}
-                </option>
-                {stores.map((s) => (
-                  <option key={s.placeId} value={s.placeId}>
-                    {s.shortName}
-                  </option>
-                ))}
-              </select>
-              {homeStoreAddress && (
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 truncate">
-                  {homeStoreAddress}
-                </p>
-              )}
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+            <LocationPickerInput
+              id="prof-home-location"
+              label={t('settings.primaryStore')}
+              placeholder={t('settings.selectHomeStore')}
+              value={homePlaceSelection}
+              onChange={handleSelectHomePlace}
+              stores={stores}
+              homeStorePlaceId={homeStorePlaceId}
+              biasCenter={biasCenter}
+              onManageLocations={onManageLocations}
+              findNearestStore={findNearestStore}
+              accentDotColor="#1d4ed8"
+            />
 
             <div>
               <label
@@ -306,7 +315,7 @@ export function ProfileSettingsView({
           </div>
         </div>
 
-        {/* Mileage Rate & CA Commute Deduction */}
+        {/* Mileage Rate & Commute Deduction */}
         <div className="p-6 space-y-4">
           <div>
             <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">

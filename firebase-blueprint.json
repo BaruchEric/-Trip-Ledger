@@ -2,7 +2,7 @@
   "entities": {
     "UserProfile": {
       "title": "UserProfile",
-      "description": "Private employee profile and mileage reimbursement preferences for a Curacao employee.",
+      "description": "Private user profile and mileage reimbursement preferences.",
       "type": "object",
       "properties": {
         "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
@@ -37,7 +37,7 @@
     },
     "MileageTrip": {
       "title": "MileageTrip",
-      "description": "An individual business driving trip logged by a Curacao employee.",
+      "description": "An individual business driving trip logged by a user.",
       "type": "object",
       "properties": {
         "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
@@ -104,7 +104,7 @@
     },
     "RouteTemplate": {
       "title": "RouteTemplate",
-      "description": "A saved recurring store-to-store or errand route for one-click trip logging.",
+      "description": "A saved recurring route between two locations for one-click trip logging.",
       "type": "object",
       "properties": {
         "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
@@ -220,28 +220,68 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "SavedLocation": {
+      "title": "SavedLocation",
+      "description": "A user-managed saved place (office, client, branch, warehouse, home, or other) for quick trip logging and map pinning.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "maxLength": 120 },
+        "address": { "type": "string", "maxLength": 240 },
+        "placeId": { "type": "string", "maxLength": 160 },
+        "category": {
+          "type": "string",
+          "enum": ["Office", "Client", "Branch", "Warehouse", "Home", "Other"]
+        },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" },
+        "hasCoordinates": { "type": "boolean" },
+        "isHome": { "type": "boolean" },
+        "notes": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "userId",
+        "name",
+        "address",
+        "placeId",
+        "category",
+        "lat",
+        "lng",
+        "hasCoordinates",
+        "isHome",
+        "notes",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/UserProfile" },
-      "description": "Private employee profile and mileage settings restricted strictly to the owning user."
+      "description": "Private user profile and mileage settings restricted strictly to the owning user."
     },
     "/trips/{tripId}": {
       "schema": { "$ref": "#/entities/MileageTrip" },
-      "description": "Business driving trips owned by the authenticated employee."
+      "description": "Business driving trips owned by the authenticated user."
     },
     "/templates/{templateId}": {
       "schema": { "$ref": "#/entities/RouteTemplate" },
-      "description": "Saved recurring route templates owned by the authenticated employee."
+      "description": "Saved recurring route templates owned by the authenticated user."
     },
     "/reports/{reportId}": {
       "schema": { "$ref": "#/entities/MileageReport" },
-      "description": "Submitted mileage reimbursement reports owned by the authenticated employee."
+      "description": "Submitted mileage reimbursement reports owned by the authenticated user."
     },
     "/expenses/{expenseId}": {
       "schema": { "$ref": "#/entities/TripExpense" },
-      "description": "Non-mileage business expenses (parking, tolls, etc.) owned by the authenticated employee."
+      "description": "Non-mileage business expenses (parking, tolls, etc.) owned by the authenticated user."
+    },
+    "/locations/{locationId}": {
+      "schema": { "$ref": "#/entities/SavedLocation" },
+      "description": "User-managed saved locations owned by the authenticated user."
     }
   }
 }

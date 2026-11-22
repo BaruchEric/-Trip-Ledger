@@ -52,6 +52,8 @@ export interface PastDriveModalProps {
   initialTrip?: MileageTrip | null;
   profile: UserProfile | null;
   stores: StoreLocation[];
+  biasCenter?: google.maps.LatLngLiteral | null;
+  onManageLocations?: () => void;
   templates: RouteTemplate[];
   findNearestStore: (
     lat: number,
@@ -71,7 +73,9 @@ function toPlaceSelectionFromTrip(
   stores: StoreLocation[]
 ): PlaceSelection | null {
   if (!name.trim()) return null;
-  const matched = placeId ? stores.find((s) => s.placeId === placeId) : undefined;
+  const matched = placeId
+    ? stores.find((s) => s.placeId === placeId && s.hasCoordinates !== false)
+    : undefined;
   return {
     name,
     address,
@@ -87,6 +91,8 @@ export function PastDriveModal({
   initialTrip = null,
   profile,
   stores,
+  biasCenter,
+  onManageLocations,
   templates,
   findNearestStore,
   onClose,
@@ -166,7 +172,9 @@ export function PastDriveModal({
     } else {
       setTripDate(offsetDateISO(1));
       if (profile?.homeStoreName) {
-        const matchedHome = stores.find((s) => s.placeId === profile.homeStorePlaceId);
+        const matchedHome = stores.find(
+          (s) => profile.homeStorePlaceId && s.placeId === profile.homeStorePlaceId && s.hasCoordinates !== false
+        );
         setOrigin({
           name: profile.homeStoreName,
           address: profile.homeStoreAddress,
@@ -175,7 +183,18 @@ export function PastDriveModal({
           lng: matchedHome?.lng,
         });
       } else {
-        setOrigin(null);
+        const homeLoc = stores.find((s) => s.isHome);
+        if (homeLoc) {
+          setOrigin({
+            name: homeLoc.shortName,
+            address: homeLoc.address,
+            placeId: homeLoc.placeId,
+            lat: homeLoc.hasCoordinates !== false ? homeLoc.lat : undefined,
+            lng: homeLoc.hasCoordinates !== false ? homeLoc.lng : undefined,
+          });
+        } else {
+          setOrigin(null);
+        }
       }
       setDestination(null);
       setPurpose('Inter-Store Transfer');
@@ -501,6 +520,8 @@ export function PastDriveModal({
               }}
               stores={stores}
               homeStorePlaceId={profile?.homeStorePlaceId}
+              biasCenter={biasCenter}
+              onManageLocations={onManageLocations ? () => { onClose(); onManageLocations(); } : undefined}
               findNearestStore={findNearestStore}
               accentDotColor="#15803d"
             />
@@ -543,6 +564,8 @@ export function PastDriveModal({
               }}
               stores={stores}
               homeStorePlaceId={profile?.homeStorePlaceId}
+              biasCenter={biasCenter}
+              onManageLocations={onManageLocations ? () => { onClose(); onManageLocations(); } : undefined}
               findNearestStore={findNearestStore}
               accentDotColor="#d97706"
             />

@@ -20,22 +20,23 @@ interface CommuteSavingsCardProps {
 
 const DEFAULT_FALLBACK_COMMUTE_MILES = 12.0;
 const DEFAULT_WEEKLY_BUSINESS_MILES = 35.0;
-const DEFAULT_OPERATING_COST_PER_MILE = 0.28; // Typical LA gas + routine maintenance
+const DEFAULT_OPERATING_COST_PER_MILE = 0.28; // Typical fuel + routine maintenance
 const DEFAULT_SHIFTS_PER_WEEK = 5;
 const DEFAULT_WEEKS_PER_YEAR = 50;
 const ROAD_CIRCUITY_FACTOR = 1.25;
 
-function computeAverageCuracaoStoreSpacing(stores: StoreLocation[]): number | null {
-  if (stores.length < 2) return null;
+function computeAverageLocationSpacing(stores: StoreLocation[]): number | null {
+  const mappable = stores.filter((s) => s.hasCoordinates !== false);
+  if (mappable.length < 2) return null;
   let totalDist = 0;
   let pairs = 0;
-  for (let i = 0; i < stores.length; i += 1) {
-    for (let j = i + 1; j < stores.length; j += 1) {
+  for (let i = 0; i < mappable.length; i += 1) {
+    for (let j = i + 1; j < mappable.length; j += 1) {
       const straight = haversineMiles(
-        stores[i].lat,
-        stores[i].lng,
-        stores[j].lat,
-        stores[j].lng
+        mappable[i].lat,
+        mappable[i].lng,
+        mappable[j].lat,
+        mappable[j].lng
       );
       totalDist += straight * ROAD_CIRCUITY_FACTOR;
       pairs += 1;
@@ -77,7 +78,7 @@ function estimateWeeklyBusinessMilesFromTrips(trips: MileageTrip[]): {
 export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCardProps) {
   const { t } = useI18n();
   const storeNetworkAvgCommute = useMemo(
-    () => computeAverageCuracaoStoreSpacing(stores),
+    () => computeAverageLocationSpacing(stores),
     [stores]
   );
   const tripWeeklyEstimate = useMemo(() => estimateWeeklyBusinessMilesFromTrips(trips), [trips]);
@@ -107,7 +108,7 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
   const [weeksPerYear, setWeeksPerYear] = useState<number>(DEFAULT_WEEKS_PER_YEAR);
   const [hasEditedManually, setHasEditedManually] = useState(false);
 
-  // Sync defaults from profile, discovered LA Curacao stores, and logged trips until user edits
+  // Sync defaults from profile, saved locations, and logged trips until user edits
   useEffect(() => {
     if (hasEditedManually) return;
     setCommuteOneWayMiles(seededCommuteMiles);
@@ -183,21 +184,24 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
 
   const commuteSourceHint =
     profile && profile.normalCommuteMiles > 0
-      ? 'Prefilled from your saved Profile commute'
+      ? t('calc.commuteHintProfile')
       : storeNetworkAvgCommute !== null
-        ? `Based on avg. distance between ${stores.length} LA Curacao stores`
-        : 'LA retail shift baseline';
+        ? t('calc.commuteHintLocations', {
+            count: stores.filter((s) => s.hasCoordinates !== false).length,
+          })
+        : t('calc.commuteHintDefault');
 
   const businessSourceHint =
     tripWeeklyEstimate.weeklyMiles !== null
-      ? `Estimated from your ${tripWeeklyEstimate.tripCount} logged ${
-          tripWeeklyEstimate.tripCount === 1 ? 'trip' : 'trips'
-        }`
-      : 'Typical LA inter-store runs';
+      ? t('calc.bizHintTrips', {
+          count: tripWeeklyEstimate.tripCount,
+          unit: tripWeeklyEstimate.tripCount === 1 ? t('common.trip') : t('common.trips'),
+        })
+      : t('calc.bizHintDefault');
 
   return (
     <section
-      aria-label="Commute Savings Calculator"
+      aria-label={t('calc.title')}
       className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden"
     >
       {/* Header */}
@@ -247,7 +251,7 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
                 min="0"
                 max="50"
                 step="0.5"
-                aria-label="Average Curacao store commute slider"
+                aria-label={t('calc.avgCommute')}
                 value={Math.min(50, commuteOneWayMiles)}
                 onChange={(e) => {
                   setCommuteOneWayMiles(parseFloat(e.target.value) || 0);
@@ -539,10 +543,10 @@ export function CommuteSavingsCard({ profile, trips, stores }: CommuteSavingsCar
 
           {/* Quiet Formula Footnote */}
           <p className="text-[11px] text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800 leading-relaxed">
-            Net Annual Savings equals reimbursable mileage payouts ({formatCurrency(metrics.annualReimbursement)})
-            minus estimated fuel and wear on those business trips ({formatCurrency(metrics.annualBusinessFuelCost)}),
-            showing how much your Curacao mileage reimbursements offset your regular Los Angeles
-            store commuting costs.
+            {t('calc.footnote', {
+              reimb: formatCurrency(metrics.annualReimbursement),
+              fuel: formatCurrency(metrics.annualBusinessFuelCost),
+            })}
           </p>
         </div>
       </div>

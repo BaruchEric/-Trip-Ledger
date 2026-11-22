@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   CheckCircle2,
@@ -51,6 +51,9 @@ export function ReportsView({
   const { t, tPurpose, tExpenseCategory, tStage, formatLocalizedDate } = useI18n();
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [pdfSavedId, setPdfSavedId] = useState<string | null>(null);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [printingReportId, setPrintingReportId] = useState<string | null>(null);
+  const printCleanupTimerRef = useRef<number | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isMarking, setIsMarking] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -79,6 +82,52 @@ export function ReportsView({
     }
     return sortedReports[0] ?? null;
   }, [sortedReports, selectedReportId]);
+
+  const clearPrintMode = useCallback(() => {
+    document.documentElement.classList.remove('report-print-mode');
+    setPrintingReportId(null);
+    if (printCleanupTimerRef.current !== null) {
+      window.clearTimeout(printCleanupTimerRef.current);
+      printCleanupTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleAfterPrint = () => clearPrintMode();
+    window.addEventListener('afterprint', handleAfterPrint);
+    return () => {
+      window.removeEventListener('afterprint', handleAfterPrint);
+      clearPrintMode();
+    };
+  }, [clearPrintMode]);
+
+  const handlePrintReport = useCallback(
+    (targetReportId?: string) => {
+      const idToPrint = targetReportId ?? activeReport?.id ?? null;
+      if (!idToPrint) return;
+
+      if (targetReportId && targetReportId !== activeReport?.id) {
+        onSelectReport(targetReportId);
+      }
+
+      document.documentElement.classList.add('report-print-mode');
+      setPrintingReportId(idToPrint);
+
+      // Allow React to paint the selected report sheet and print CSS class before invoking window.print()
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          window.print();
+          if (printCleanupTimerRef.current !== null) {
+            window.clearTimeout(printCleanupTimerRef.current);
+          }
+          printCleanupTimerRef.current = window.setTimeout(() => {
+            clearPrintMode();
+          }, 1500);
+        });
+      });
+    },
+    [activeReport?.id, onSelectReport, clearPrintMode]
+  );
 
   // Match expenses linked directly to a report OR linked to any trip inside that report
   const expensesByReportId = useMemo(() => {
@@ -145,12 +194,13 @@ export function ReportsView({
     }
   };
 
-  const handleDownloadPdf = (
+  const generatePrintablePdfSummary = (
     report: MileageReport,
     reportTrips: MileageTrip[],
     reportExpenses: TripExpense[]
   ) => {
     setErrorMsg(null);
+    setIsExportingPdf(true);
     try {
       downloadReportPdf(report, reportTrips, reportExpenses);
       setPdfSavedId(report.id);
@@ -158,6 +208,8 @@ export function ReportsView({
     } catch (err) {
       console.error('PDF generation failed:', err);
       setErrorMsg('Unable to generate PDF document. Please try again or use Print.');
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
@@ -207,8 +259,10 @@ export function ReportsView({
 
   return (
     <div className="space-y-5">
-      {/* Current-Year Monthly Mileage Reimbursement Comparison Chart */}
-      <MonthlyReimbursementChart trips={trips} isDark={isDark} />
+      {/* Current-Year Monthly Mileage Reimbursement Comparison Chart (hidden when printing a report) */}
+      <div className="no-print">
+        <MonthlyReimbursementChart trips={trips} isDark={isDark} />
+      </div>
 
       {/* Unsubmitted Ready Queue Banner (hidden when printing) */}
       {readyTrips.length > 0 && (
@@ -294,58 +348,90 @@ export function ReportsView({
             <div className="divide-y divide-slate-100 dark:divide-slate-800 max-h-[640px] overflow-y-auto">
               {sortedReports.map((rep) => {
                 const isSelected = activeReport?.id === rep.id;
+                const repTrips = trips
+                  .filter((t) => t.reportId === rep.id)
+                  .sort((a, b) => a.tripDate.localeCompare(b.tripDate));
                 const repExps = expensesByReportId[rep.id] ?? [];
                 const repExpTotal = round2(repExps.reduce((sum, e) => sum + e.amount, 0));
                 const repGrandTotal = round2(rep.totalReimbursement + repExpTotal);
                 return (
-                  <button
+                  <div
                     key={rep.id}
-                    type="button"
-                    onClick={() => onSelectReport(rep.id)}
-                    className={`w-full text-start px-4 py-3.5 transition-colors ${
+                    className={`flex items-stretch transition-colors ${
                       isSelected
                         ? 'bg-blue-50/70 dark:bg-blue-950/50'
                         : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-semibold font-mono text-slate-900 dark:text-slate-100">
-                        {rep.reportNumber}
-                      </span>
-                      <span
-                        className={`text-xs font-medium ${
-                          rep.status === 'reimbursed'
-                            ? 'text-emerald-700 dark:text-emerald-400'
-                            : 'text-blue-700 dark:text-blue-400'
-                        }`}
-                      >
-                        {rep.status === 'reimbursed'
-                          ? tStage('reimbursed')
-                          : tStage('submitted')}
-                      </span>
-                    </div>
-                    <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-                      {formatLocalizedDate(rep.periodStart)} – {formatLocalizedDate(rep.periodEnd)}
-                    </div>
-                    <div className="mt-1.5 flex items-center justify-between text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                      <span>
-                        {rep.tripCount}{' '}
-                        {rep.tripCount === 1 ? t('nav.tripSingular') : t('nav.tripPlural')} ·{' '}
-                        <span dir="ltr">
-                          {rep.totalMiles.toFixed(1)} {t('common.mi')}
+                    <button
+                      type="button"
+                      onClick={() => onSelectReport(rep.id)}
+                      className="flex-1 min-w-0 text-start px-4 py-3.5"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-semibold font-mono text-slate-900 dark:text-slate-100 truncate">
+                          {rep.reportNumber}
                         </span>
-                        {repExpTotal > 0
-                          ? ` · +${formatCurrency(repExpTotal)} ${t('nav.expShort')}`
-                          : ''}
-                      </span>
-                      <span
-                        className="font-semibold text-slate-900 dark:text-slate-100"
-                        dir="ltr"
+                        <span
+                          className={`text-xs font-medium shrink-0 ${
+                            rep.status === 'reimbursed'
+                              ? 'text-emerald-700 dark:text-emerald-400'
+                              : 'text-blue-700 dark:text-blue-400'
+                          }`}
+                        >
+                          {rep.status === 'reimbursed'
+                            ? tStage('reimbursed')
+                            : tStage('submitted')}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                        {formatLocalizedDate(rep.periodStart)} – {formatLocalizedDate(rep.periodEnd)}
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
+                        <span>
+                          {rep.tripCount}{' '}
+                          {rep.tripCount === 1 ? t('nav.tripSingular') : t('nav.tripPlural')} ·{' '}
+                          <span dir="ltr">
+                            {rep.totalMiles.toFixed(1)} {t('common.mi')}
+                          </span>
+                          {repExpTotal > 0
+                            ? ` · +${formatCurrency(repExpTotal)} ${t('nav.expShort')}`
+                            : ''}
+                        </span>
+                        <span
+                          className="font-semibold text-slate-900 dark:text-slate-100"
+                          dir="ltr"
+                        >
+                          {formatCurrency(repGrandTotal)}
+                        </span>
+                      </div>
+                    </button>
+                    <div className="flex items-center gap-0.5 pe-2.5">
+                      <button
+                        type="button"
+                        onClick={() => handlePrintReport(rep.id)}
+                        title={t('reports.print')}
+                        aria-label={`${t('reports.print')} ${rep.reportNumber}`}
+                        className="p-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-colors"
                       >
-                        {formatCurrency(repGrandTotal)}
-                      </span>
+                        <Printer className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isExportingPdf}
+                        onClick={() => generatePrintablePdfSummary(rep, repTrips, repExps)}
+                        title={t('reports.downloadPdf')}
+                        aria-label={`${t('reports.downloadPdf')} ${rep.reportNumber}`}
+                        className="p-2 text-slate-500 dark:text-slate-400 hover:text-blue-700 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {pdfSavedId === rep.id ? (
+                          <Check className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                        ) : (
+                          <FileDown className="w-4 h-4" />
+                        )}
+                      </button>
                     </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -378,8 +464,11 @@ export function ReportsView({
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => handleDownloadPdf(activeReport, activeTrips, activeExpenses)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 rounded-lg transition-colors whitespace-nowrap"
+                    disabled={isExportingPdf}
+                    onClick={() =>
+                      generatePrintablePdfSummary(activeReport, activeTrips, activeExpenses)
+                    }
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-500 disabled:opacity-50 rounded-lg transition-colors whitespace-nowrap"
                   >
                     {pdfSavedId === activeReport.id ? (
                       <>
@@ -395,7 +484,7 @@ export function ReportsView({
                   </button>
                   <button
                     type="button"
-                    onClick={() => window.print()}
+                    onClick={() => handlePrintReport(activeReport.id)}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg transition-colors whitespace-nowrap"
                   >
                     <Printer className="w-3.5 h-3.5" />
@@ -441,12 +530,18 @@ export function ReportsView({
               </div>
 
               {/* Official Printable Expense Sheet */}
-              <article className="print-sheet bg-white dark:bg-slate-900 print:bg-white border border-slate-200 dark:border-slate-800 print:border-none rounded-xl p-6 sm:p-8 space-y-6">
+              <article
+                className={`print-sheet bg-white dark:bg-slate-900 print:bg-white border border-slate-200 dark:border-slate-800 print:border-none rounded-xl p-6 sm:p-8 space-y-6 ${
+                  printingReportId === activeReport.id ? 'report-print-active' : ''
+                }`}
+              >
                 {/* Report Header */}
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-slate-200 dark:border-slate-800 print:border-slate-200">
                   <div>
                     <div className="text-xs font-semibold text-blue-800 dark:text-blue-400 print:text-blue-800 tracking-wide">
-                      {t('reports.regionBanner')}
+                      {activeReport.department
+                        ? activeReport.department.toUpperCase()
+                        : t('reports.regionBanner')}
                     </div>
                     <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 print:text-slate-900 mt-1">
                       {t('reports.sheetTitle')}
@@ -492,7 +587,7 @@ export function ReportsView({
                       {t('reports.department')}
                     </div>
                     <div className="font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900 mt-0.5">
-                      {activeReport.department || 'Retail Operations'}
+                      {activeReport.department || '—'}
                     </div>
                   </div>
                   <div>
@@ -500,7 +595,7 @@ export function ReportsView({
                       {t('reports.homeStore')}
                     </div>
                     <div className="font-semibold text-slate-900 dark:text-slate-100 print:text-slate-900 mt-0.5">
-                      {activeReport.homeStoreName || 'Los Angeles Region'}
+                      {activeReport.homeStoreName || '—'}
                     </div>
                   </div>
                   <div>
@@ -708,7 +803,7 @@ export function ReportsView({
                 )}
 
                 {/* Employee Certification & Manager Approval Signature Lines */}
-                <div className="pt-6 border-t border-slate-200 dark:border-slate-800 print:border-slate-200 space-y-6">
+                <div className="print-keep-together pt-6 border-t border-slate-200 dark:border-slate-800 print:border-slate-200 space-y-6">
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 print:text-slate-500 leading-relaxed">
                     {t('reports.certText')}
                   </p>

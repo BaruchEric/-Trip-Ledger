@@ -7,7 +7,8 @@ export const THRESHOLD_PRESETS = [35, 50, 75, 100] as const;
 
 const APPROACHING_RATIO = 0.85;
 const HIGH_ALERT_RATIO = 1.5;
-const STORAGE_KEY = 'curacao_daily_mileage_threshold_mi';
+const STORAGE_KEY = 'miletrack_daily_mileage_threshold_mi';
+const LEGACY_STORAGE_KEY = 'curacao_daily_mileage_threshold_mi';
 
 export type DailyMileageSeverity = 'normal' | 'approaching' | 'exceeded' | 'high';
 
@@ -31,7 +32,9 @@ export function clampShiftThreshold(miles: number): number {
 
 export function loadDailyMileageThreshold(): number {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw =
+      window.localStorage.getItem(STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return DEFAULT_SHIFT_COMMUTE_THRESHOLD_MILES;
     const parsed = parseFloat(raw);
     if (!Number.isFinite(parsed)) return DEFAULT_SHIFT_COMMUTE_THRESHOLD_MILES;

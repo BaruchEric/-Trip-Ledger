@@ -25,14 +25,8 @@ const STOP_WORDS: Record<string, boolean> = {
   from: true,
   with: true,
   into: true,
-  curacao: true,
-  curaçao: true,
   store: true,
   branch: true,
-  los: true,
-  angeles: true,
-  california: true,
-  usa: true,
   blvd: true,
   ave: true,
   avenue: true,
@@ -196,7 +190,7 @@ export function suggestTripPurpose(
     }
   }
 
-  // 2. Secondary Fallback: Common retail travel keywords when no saved template matches yet
+  // 2. Secondary Fallback: Common business travel keywords when no saved template matches yet
   let fallbackPurpose: TripPurpose | null = null;
   let fallbackMatches: string[] = [];
 

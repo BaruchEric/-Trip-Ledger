@@ -90,8 +90,14 @@ interface TripLoggerViewProps {
   profile: UserProfile | null;
   stores: StoreLocation[];
   storesLoading: boolean;
-  storesError: string | null;
-  onRefreshStores: () => void;
+  storesError?: string | null;
+  biasCenter?: google.maps.LatLngLiteral | null;
+  onManageLocations?: () => void;
+  pendingPlacePick?: {
+    role: 'origin' | 'destination';
+    place: PlaceSelection;
+    nonce: number;
+  } | null;
   findNearestStore: (
     lat: number,
     lng: number,
@@ -117,7 +123,9 @@ export function TripLoggerView({
   stores,
   storesLoading,
   storesError,
-  onRefreshStores,
+  biasCenter,
+  onManageLocations,
+  pendingPlacePick,
   findNearestStore,
   templates,
   trips,
@@ -168,19 +176,53 @@ export function TripLoggerView({
   const ratePerMile = profile?.ratePerMile ?? DEFAULT_RATE_PER_MILE;
   const normalCommuteMiles = profile?.normalCommuteMiles ?? 0;
 
-  // Auto-fill Home Curacao Store as default Origin once profile & stores load
+  // Auto-fill Primary / Home Location as default Origin once profile or saved locations load
   useEffect(() => {
-    if (hasPrefilledHome || origin || !profile?.homeStoreName) return;
-    const matched = stores.find((s) => s.placeId === profile.homeStorePlaceId);
-    setOrigin({
-      name: profile.homeStoreName,
-      address: profile.homeStoreAddress,
-      placeId: profile.homeStorePlaceId,
-      lat: matched?.lat,
-      lng: matched?.lng,
-    });
-    setHasPrefilledHome(true);
+    if (hasPrefilledHome || origin) return;
+    if (profile?.homeStoreName) {
+      const matched = stores.find(
+        (s) => profile.homeStorePlaceId && s.placeId === profile.homeStorePlaceId
+      );
+      const hasCoords = matched && matched.hasCoordinates !== false;
+      setOrigin({
+        name: profile.homeStoreName,
+        address: profile.homeStoreAddress,
+        placeId: profile.homeStorePlaceId,
+        lat: hasCoords ? matched.lat : undefined,
+        lng: hasCoords ? matched.lng : undefined,
+      });
+      setHasPrefilledHome(true);
+      return;
+    }
+    const homeLoc = stores.find((s) => s.isHome);
+    if (homeLoc) {
+      const hasCoords = homeLoc.hasCoordinates !== false;
+      setOrigin({
+        name: homeLoc.shortName,
+        address: homeLoc.address,
+        placeId: homeLoc.placeId,
+        lat: hasCoords ? homeLoc.lat : undefined,
+        lng: hasCoords ? homeLoc.lng : undefined,
+      });
+      setHasPrefilledHome(true);
+    }
   }, [hasPrefilledHome, origin, profile, stores]);
+
+  // Apply origin/destination quick-pick dispatched from Saved Locations view
+  useEffect(() => {
+    if (!pendingPlacePick) return;
+    if (pendingPlacePick.role === 'origin') {
+      setOrigin(pendingPlacePick.place);
+    } else {
+      setDestination(pendingPlacePick.place);
+    }
+    setRoutePath(undefined);
+    setActiveRouteMeta(null);
+    setManualOverride(false);
+    setPurposeTouchedManually(false);
+    setCaptureMethod('route_auto');
+    setFeedback(null);
+  }, [pendingPlacePick?.nonce]);
 
   const purposeSuggestion = useMemo(
     () =>
@@ -438,15 +480,15 @@ export function TripLoggerView({
       name: tpl.originName,
       address: tpl.originAddress,
       placeId: tpl.originPlaceId,
-      lat: matchedOrigin?.lat,
-      lng: matchedOrigin?.lng,
+      lat: matchedOrigin && matchedOrigin.hasCoordinates !== false ? matchedOrigin.lat : undefined,
+      lng: matchedOrigin && matchedOrigin.hasCoordinates !== false ? matchedOrigin.lng : undefined,
     });
     setDestination({
       name: tpl.destinationName,
       address: tpl.destinationAddress,
       placeId: tpl.destinationPlaceId,
-      lat: matchedDest?.lat,
-      lng: matchedDest?.lng,
+      lat: matchedDest && matchedDest.hasCoordinates !== false ? matchedDest.lat : undefined,
+      lng: matchedDest && matchedDest.hasCoordinates !== false ? matchedDest.lng : undefined,
     });
     setPurpose(tpl.purpose);
     setIsRoundTrip(tpl.isRoundTrip);
@@ -499,7 +541,7 @@ export function TripLoggerView({
       if (todayProjection.severity === 'exceeded' || todayProjection.severity === 'high') {
         setFeedback({
           type: 'warning',
-          text: `Logged "${tpl.label}" (${billable.toFixed(1)} mi · ${formatCurrency(amount)}). Heads up: today's total is now ${todayProjection.projectedMiles.toFixed(1)} mi, exceeding your ${todayProjection.thresholdMiles.toFixed(0)} mi retail shift threshold by ${todayProjection.overageMiles.toFixed(1)} mi.`,
+          text: `Logged "${tpl.label}" (${billable.toFixed(1)} mi · ${formatCurrency(amount)}). Heads up: today's total is now ${todayProjection.projectedMiles.toFixed(1)} mi, exceeding your ${todayProjection.thresholdMiles.toFixed(0)} mi daily mileage threshold by ${todayProjection.overageMiles.toFixed(1)} mi.`,
         });
       } else {
         setFeedback({
@@ -607,7 +649,7 @@ export function TripLoggerView({
     setIsSavingTemplate(true);
     setFeedback(null);
     try {
-      const label = `${origin.name.replace(/^Curacao\s*[—-]\s*/i, '')} to ${destination.name.replace(/^Curacao\s*[—-]\s*/i, '')}`.slice(
+      const label = `${origin.name} to ${destination.name}`.slice(
         0,
         FIELD_LIMITS.templateLabel
       );
@@ -764,7 +806,7 @@ export function TripLoggerView({
         onClearAll={autoDetector.clearDetectedDrives}
       />
 
-      {/* Main 2-Column Balanced Split: Auto Trip Builder + Live LA Route Map */}
+      {/* Main 2-Column Balanced Split: Auto Trip Builder + Live Route Map */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
         {/* Left Column: Automated Trip Builder */}
         <div className="lg:col-span-5 flex flex-col bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -791,6 +833,8 @@ export function TripLoggerView({
                   onChange={handleOriginChange}
                   stores={stores}
                   homeStorePlaceId={profile?.homeStorePlaceId}
+                  biasCenter={biasCenter}
+                  onManageLocations={onManageLocations}
                   findNearestStore={findNearestStore}
                   accentDotColor="#15803d"
                 />
@@ -817,6 +861,8 @@ export function TripLoggerView({
                   onChange={handleDestinationChange}
                   stores={stores}
                   homeStorePlaceId={profile?.homeStorePlaceId}
+                  biasCenter={biasCenter}
+                  onManageLocations={onManageLocations}
                   findNearestStore={findNearestStore}
                   accentDotColor="#d97706"
                 />
@@ -1278,13 +1324,13 @@ export function TripLoggerView({
           </form>
         </div>
 
-        {/* Right Column: Live Interactive LA Curacao Route Map */}
+        {/* Right Column: Live Interactive Route Map */}
         <div className="lg:col-span-7 flex flex-col">
           <RouteMapPanel
             stores={stores}
             storesLoading={storesLoading}
             storesError={storesError}
-            onRefreshStores={onRefreshStores}
+            onManageLocations={onManageLocations}
             origin={origin}
             destination={destination}
             homeStorePlaceId={profile?.homeStorePlaceId}

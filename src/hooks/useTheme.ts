@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 
-const THEME_STORAGE_KEY = 'curacao_mileage_theme';
+const THEME_STORAGE_KEY = 'miletrack_theme';
+const LEGACY_THEME_STORAGE_KEY = 'curacao_mileage_theme';
 
 function getSystemPrefersDark(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -13,7 +14,9 @@ function getSystemPrefersDark(): boolean {
 
 function loadStoredTheme(): ThemePreference {
   try {
-    const raw = window.localStorage.getItem(THEME_STORAGE_KEY);
+    const raw =
+      window.localStorage.getItem(THEME_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_THEME_STORAGE_KEY);
     if (raw === 'light' || raw === 'dark' || raw === 'system') {
       return raw;
     }

@@ -28,12 +28,12 @@ export function downloadReportCsv(
   const grandTotal = round2(report.totalReimbursement + expensesSubtotal);
 
   const headerMeta = [
-    ['Company', 'Curacao (Los Angeles Retail)'],
+    ['Application', 'MileTrack'],
     ['Report Number', report.reportNumber],
-    ['Employee Name', report.employeeName || 'Not specified'],
+    ['Driver / Employee', report.employeeName || 'Not specified'],
     ['Employee ID', report.employeeId || 'Not specified'],
-    ['Department', report.department || 'Retail Operations'],
-    ['Home Store', report.homeStoreName || 'Not specified'],
+    ['Department / Team', report.department || 'Not specified'],
+    ['Primary Location', report.homeStoreName || 'Not specified'],
     ['Vehicle', report.vehicleInfo || 'Personal Vehicle'],
     ['Pay Period', `${report.periodStart} to ${report.periodEnd}`],
     ['Total Miles', report.totalMiles.toFixed(1)],
@@ -102,7 +102,7 @@ export function downloadReportCsv(
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `Curacao_Mileage_${report.reportNumber}.csv`;
+  link.download = `MileTrack_Report_${report.reportNumber}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -181,7 +181,7 @@ export function downloadTripsCsv(trips: MileageTrip[]) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
-  link.download = `Curacao_Selected_Trips_${today}.csv`;
+  link.download = `MileTrack_Trips_${today}.csv`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
@@ -201,15 +201,15 @@ export function buildReportEmailText(
   const grandTotal = round2(report.totalReimbursement + expensesSubtotal);
 
   const lines = [
-    `Subject: Mileage Reimbursement Report ${report.reportNumber} — ${report.employeeName || 'Curacao Employee'}`,
+    `Subject: Mileage Reimbursement Report ${report.reportNumber} — ${report.employeeName || 'Driver'}`,
     '',
     `Hello,`,
     '',
     `Please find my business mileage & travel expense reimbursement summary for ${formatDisplayDate(report.periodStart)} – ${formatDisplayDate(report.periodEnd)}.`,
     '',
-    `Employee: ${report.employeeName || '—'}${report.employeeId ? ` (ID: ${report.employeeId})` : ''}`,
-    `Department: ${report.department || 'Retail Operations'}`,
-    `Home Store: ${report.homeStoreName || '—'}`,
+    `Driver / Employee: ${report.employeeName || '—'}${report.employeeId ? ` (ID: ${report.employeeId})` : ''}`,
+    `Department / Team: ${report.department || '—'}`,
+    `Primary Location: ${report.homeStoreName || '—'}`,
     `Vehicle: ${report.vehicleInfo || 'Personal Vehicle'}`,
     `Report Ref: ${report.reportNumber}`,
     '',
@@ -243,7 +243,7 @@ export function buildReportEmailText(
     `Total Reimbursement Requested: ${formatCurrency(grandTotal)}`,
     '',
     `Thank you,`,
-    `${report.employeeName || 'Curacao Employee'}`,
+    `${report.employeeName || 'Driver'}`,
   ];
 
   return lines.join('\n');

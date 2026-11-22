@@ -31,7 +31,7 @@ import {
   type TripExpense,
 } from '../types/mileage';
 
-const LA_DEFAULT_CENTER = { lat: 34.0407, lng: -118.2468 };
+const FALLBACK_MAP_CENTER = { lat: 39.8283, lng: -98.5795 };
 const METERS_PER_MILE = 1609.344;
 
 interface TripRouteMiniMapProps {
@@ -80,7 +80,7 @@ function resolveTripWaypoint(
   knownLatLng: google.maps.LatLngLiteral | null;
 } {
   if (placeId) {
-    const matched = stores.find((s) => s.placeId === placeId);
+    const matched = stores.find((s) => s.placeId === placeId && s.hasCoordinates !== false);
     if (matched) {
       const coords = { lat: matched.lat, lng: matched.lng };
       return { waypoint: coords, knownLatLng: coords };
@@ -521,7 +521,12 @@ export function TripRouteMiniMap({
         <div className="lg:col-span-7 relative h-[280px] sm:h-[310px] w-full bg-slate-100 dark:bg-slate-950 border-b lg:border-b-0 lg:border-e border-slate-200 dark:border-slate-800">
           <GoogleMap
             mapId="DEMO_MAP_ID"
-            defaultCenter={LA_DEFAULT_CENTER}
+            defaultCenter={(() => {
+              const firstMappable = stores.find((s) => s.hasCoordinates !== false);
+              return firstMappable
+                ? { lat: firstMappable.lat, lng: firstMappable.lng }
+                : FALLBACK_MAP_CENTER;
+            })()}
             defaultZoom={11}
             gestureHandling="greedy"
             streetViewControl={false}

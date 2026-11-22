@@ -132,12 +132,15 @@ export function DriveTrackingHeader({
   const { t, isRtl } = useI18n();
   const [showSettings, setShowSettings] = useState(false);
 
-  // Pick two live Google Maps-discovered Curacao stores for desktop preview simulation
+  // Pick two mappable saved locations for desktop preview simulation
   const simulationPair = useMemo(() => {
-    if (stores.length < 2) return null;
-    const home = homeStorePlaceId ? stores.find((s) => s.placeId === homeStorePlaceId) : undefined;
-    const fromStore = home ?? stores[0];
-    const toStore = stores.find((s) => s.placeId !== fromStore.placeId) ?? stores[1];
+    const mappable = stores.filter((s) => s.hasCoordinates !== false);
+    if (mappable.length < 2) return null;
+    const home = mappable.find(
+      (s) => s.isHome || (homeStorePlaceId && s.placeId === homeStorePlaceId)
+    );
+    const fromStore = home ?? mappable[0];
+    const toStore = mappable.find((s) => (s.id ?? s.placeId) !== (fromStore.id ?? fromStore.placeId)) ?? mappable[1];
     return { fromStore, toStore };
   }, [stores, homeStorePlaceId]);
 

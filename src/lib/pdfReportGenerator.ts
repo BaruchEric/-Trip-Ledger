@@ -48,18 +48,18 @@ export function downloadReportPdf(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(...BRAND_BLUE);
-  doc.text('CURACAO RETAIL  ·  LOS ANGELES REGION', marginX, cursorY);
+  doc.text('MILETRACK  ·  BUSINESS MILEAGE & EXPENSE REPORT', marginX, cursorY);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(17);
   doc.setTextColor(...BRAND_NAVY);
-  doc.text('Employee Mileage Reimbursement Report', marginX, cursorY + 18);
+  doc.text('Business Mileage Reimbursement Report', marginX, cursorY + 18);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(...SLATE_600);
   doc.text(
-    'California Business Expense Reimbursement Log (CA Labor Code § 2802)',
+    'Itemized Business Travel & Expense Reimbursement Log',
     marginX,
     cursorY + 32
   );
@@ -115,11 +115,11 @@ export function downloadReportPdf(
     doc.text(value, x, y + 13, { maxWidth: 162 });
   };
 
-  drawField('Employee Name', report.employeeName || 'Not specified', col1X, row1Y);
+  drawField('Driver / Employee', report.employeeName || 'Not specified', col1X, row1Y);
   drawField('Employee ID', report.employeeId || '—', col2X, row1Y, true);
-  drawField('Department', report.department || 'Retail Operations', col3X, row1Y);
+  drawField('Department / Team', report.department || '—', col3X, row1Y);
 
-  drawField('Home Store', report.homeStoreName || 'Los Angeles Region', col1X, row2Y);
+  drawField('Primary Location', report.homeStoreName || 'Not specified', col1X, row2Y);
   drawField('Personal Vehicle', report.vehicleInfo || 'Personal Vehicle', col2X, row2Y);
   drawField(
     'Report Status',
@@ -391,6 +391,78 @@ export function downloadReportPdf(
     currentBottomY = summaryY + 34;
   }
 
+  // Business Purpose Summary Breakdown Table
+  if (sortedTrips.length > 0) {
+    const byPurpose = new Map<
+      string,
+      { count: number; miles: number; amount: number }
+    >();
+    for (const t of sortedTrips) {
+      const existing = byPurpose.get(t.purpose) ?? { count: 0, miles: 0, amount: 0 };
+      existing.count += 1;
+      existing.miles += t.billableMiles;
+      existing.amount += t.reimbursementAmount;
+      byPurpose.set(t.purpose, existing);
+    }
+
+    const purposeRows = Array.from(byPurpose.entries())
+      .sort((a, b) => b[1].amount - a[1].amount)
+      .map(([purposeLabel, agg]) => [
+        purposeLabel,
+        `${agg.count} ${agg.count === 1 ? 'trip' : 'trips'}`,
+        `${agg.miles.toFixed(1)} mi`,
+        formatCurrency(round2(agg.amount)),
+      ]);
+
+    let purposeHeaderY = currentBottomY + 20;
+    if (purposeHeaderY + 72 > pageHeight - 52) {
+      doc.addPage();
+      doc.setFillColor(...BRAND_BLUE);
+      doc.rect(0, 0, pageWidth, 8, 'F');
+      purposeHeaderY = 44;
+    }
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...BRAND_NAVY);
+    doc.text('Mileage Summary by Business Purpose', marginX, purposeHeaderY);
+
+    autoTable(doc, {
+      startY: purposeHeaderY + 8,
+      margin: { left: marginX, right: marginX, bottom: 52 },
+      head: [['Business Purpose', 'Trips', 'Billable Miles', 'Mileage Subtotal']],
+      body: purposeRows,
+      theme: 'grid',
+      styles: {
+        font: 'helvetica',
+        fontSize: 8.2,
+        cellPadding: { top: 5.5, right: 6, bottom: 5.5, left: 6 },
+        textColor: BRAND_NAVY,
+        lineColor: BORDER_LIGHT,
+        lineWidth: 0.5,
+      },
+      headStyles: {
+        fillColor: [241, 245, 249],
+        textColor: BRAND_NAVY,
+        fontStyle: 'bold',
+        fontSize: 8,
+      },
+      alternateRowStyles: {
+        fillColor: [252, 253, 255],
+      },
+      columnStyles: {
+        0: { cellWidth: 'auto', fontStyle: 'bold' },
+        1: { cellWidth: 72, halign: 'right', font: 'courier' },
+        2: { cellWidth: 84, halign: 'right', font: 'courier' },
+        3: { cellWidth: 92, halign: 'right', font: 'courier', fontStyle: 'bold' },
+      },
+    });
+
+    currentBottomY =
+      (doc as unknown as { lastAutoTable?: { finalY?: number } }).lastAutoTable?.finalY ??
+      purposeHeaderY + 80;
+  }
+
   // Certification & Dual Signature Block
   let sigY = currentBottomY + 24;
   const requiredSigHeight = 112;
@@ -416,7 +488,7 @@ export function downloadReportPdf(
   doc.setFontSize(8);
   doc.setTextColor(...SLATE_600);
   const certText =
-    'I certify that the mileage and any itemized business expenses (such as parking or tolls) in this report were incurred on authorized Curacao company business using my personal vehicle, exclude non-reimbursable personal commuting where applicable, and are accurate to the best of my knowledge.';
+    'I certify that the mileage and any itemized business expenses (such as parking or tolls) in this report were incurred on authorized business travel using my personal vehicle, exclude non-reimbursable personal commuting where applicable, and are accurate to the best of my knowledge.';
   const certLines = doc.splitTextToSize(certText, contentWidth);
   doc.text(certLines, marginX, sigY);
 
@@ -431,10 +503,10 @@ export function downloadReportPdf(
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...SLATE_600);
-  doc.text('Employee Signature', marginX, lineY + 12);
+  doc.text('Driver / Employee Signature', marginX, lineY + 12);
   doc.text('Date', marginX + sigColWidth, lineY + 12, { align: 'right' });
 
-  doc.text('Store Manager / HR Approval', marginX + sigColWidth + 32, lineY + 12);
+  doc.text('Manager / Approver Signature', marginX + sigColWidth + 32, lineY + 12);
   doc.text('Date', pageWidth - marginX, lineY + 12, { align: 'right' });
 
   // Page Footers across all pages
@@ -455,7 +527,7 @@ export function downloadReportPdf(
     doc.setFontSize(7.5);
     doc.setTextColor(...SLATE_400);
     doc.text(
-      `Curacao Mileage  ·  Report ${report.reportNumber}  ·  Generated ${generatedStamp}`,
+      `MileTrack  ·  Report ${report.reportNumber}  ·  Generated ${generatedStamp}`,
       marginX,
       pageHeight - 20
     );
@@ -464,7 +536,7 @@ export function downloadReportPdf(
     });
   }
 
-  doc.save(`Curacao_Mileage_Report_${report.reportNumber}.pdf`);
+  doc.save(`MileTrack_Mileage_Report_${report.reportNumber}.pdf`);
 }
 
 export interface TripReceiptPdfOptions {
@@ -525,7 +597,7 @@ export function downloadTripReceiptPdf(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
   doc.setTextColor(...BRAND_BLUE);
-  doc.text('CURACAO RETAIL  ·  LOS ANGELES REGION', marginX, cursorY);
+  doc.text('MILETRACK  ·  TRIP MILEAGE RECEIPT', marginX, cursorY);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(17);
@@ -536,7 +608,7 @@ export function downloadTripReceiptPdf(
   doc.setFontSize(8.5);
   doc.setTextColor(...SLATE_600);
   doc.text(
-    'Single-Trip Business Travel Record (CA Labor Code § 2802)',
+    'Single-Trip Business Travel & Expense Record',
     marginX,
     cursorY + 32
   );
@@ -592,9 +664,9 @@ export function downloadTripReceiptPdf(
     doc.text(value, x, y + 13, { maxWidth: 162 });
   };
 
-  drawField('Employee Name', options.employeeName || 'Not specified', col1X, row1Y);
+  drawField('Driver / Employee', options.employeeName || 'Not specified', col1X, row1Y);
   drawField('Employee ID', options.employeeId || '—', col2X, row1Y, true);
-  drawField('Department', options.department || 'Retail Operations', col3X, row1Y);
+  drawField('Department / Team', options.department || '—', col3X, row1Y);
 
   drawField('Business Purpose', trip.purpose, col1X, row2Y);
   drawField('Personal Vehicle', options.vehicleInfo || 'Personal Vehicle', col2X, row2Y);
@@ -764,7 +836,7 @@ export function downloadTripReceiptPdf(
   doc.setFontSize(8);
   doc.setTextColor(...SLATE_600);
   const certText =
-    'I certify that this trip was driven on authorized Curacao company business using my personal vehicle and that all distances and expenses recorded above are accurate.';
+    'I certify that this trip was driven on authorized business travel using my personal vehicle and that all distances and expenses recorded above are accurate.';
   const certLines = doc.splitTextToSize(certText, contentWidth);
   doc.text(certLines, marginX, sigY + 14);
 
@@ -777,9 +849,9 @@ export function downloadTripReceiptPdf(
 
   doc.setFontSize(8);
   doc.setTextColor(...SLATE_600);
-  doc.text('Employee Signature', marginX, lineY + 12);
+  doc.text('Driver / Employee Signature', marginX, lineY + 12);
   doc.text('Date', marginX + sigColWidth, lineY + 12, { align: 'right' });
-  doc.text('Manager / HR Verification', marginX + sigColWidth + 32, lineY + 12);
+  doc.text('Manager / Approver Verification', marginX + sigColWidth + 32, lineY + 12);
   doc.text('Date', pageWidth - marginX, lineY + 12, { align: 'right' });
 
   // Page Footer
@@ -794,11 +866,11 @@ export function downloadTripReceiptPdf(
   doc.setFontSize(7.5);
   doc.setTextColor(...SLATE_400);
   doc.text(
-    `Curacao Mileage  ·  Trip Receipt ${receiptRef}  ·  Generated ${generatedStamp}`,
+    `MileTrack  ·  Trip Receipt ${receiptRef}  ·  Generated ${generatedStamp}`,
     marginX,
     pageHeight - 20
   );
   doc.text('Page 1 of 1', pageWidth - marginX, pageHeight - 20, { align: 'right' });
 
-  doc.save(`Curacao_Trip_Receipt_${trip.tripDate}_${shortId}.pdf`);
+  doc.save(`MileTrack_Trip_Receipt_${trip.tripDate}_${shortId}.pdf`);
 }

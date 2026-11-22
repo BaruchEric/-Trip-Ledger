@@ -14,6 +14,7 @@ import {
   Clock,
   Layers,
   Loader2,
+  MapPin,
   Navigation,
   RefreshCw,
   Route as RouteIcon,
@@ -37,7 +38,7 @@ import {
   type StoreLocation,
 } from '../types/mileage';
 
-const LA_DEFAULT_CENTER = { lat: 34.0407, lng: -118.2468 };
+const DEFAULT_MAP_CENTER = { lat: 39.8283, lng: -98.5795 };
 
 export interface ComputedRouteMetrics {
   oneWayMiles: number;
@@ -52,8 +53,8 @@ export interface ComputedRouteMetrics {
 interface RouteMapPanelProps {
   stores: StoreLocation[];
   storesLoading: boolean;
-  storesError: string | null;
-  onRefreshStores: () => void;
+  storesError?: string | null;
+  onManageLocations?: () => void;
   origin: PlaceSelection | null;
   destination: PlaceSelection | null;
   homeStorePlaceId?: string;
@@ -65,8 +66,11 @@ interface RouteMapPanelProps {
 }
 
 interface RouteOverlayControllerProps {
+  mappableStores: StoreLocation[];
   origin: PlaceSelection | null;
   destination: PlaceSelection | null;
+  resolvedOriginPos: google.maps.LatLngLiteral | null;
+  resolvedDestPos: google.maps.LatLngLiteral | null;
   gpsPoints: GpsPoint[];
   showTrafficLayer: boolean;
   avoidTolls: boolean;
@@ -159,8 +163,11 @@ function createTrafficStyledPolylines(
 }
 
 function RouteOverlayController({
+  mappableStores,
   origin,
   destination,
+  resolvedOriginPos,
+  resolvedDestPos,
   gpsPoints,
   showTrafficLayer,
   avoidTolls,
@@ -180,11 +187,64 @@ function RouteOverlayController({
   const renderedPolylinesRef = useRef<google.maps.Polyline[]>([]);
   const trafficLayerRef = useRef<google.maps.TrafficLayer | null>(null);
   const gpsPolylineRef = useRef<google.maps.Polyline | null>(null);
+  const lastFittedKeyRef = useRef<string>('');
 
   const onRoutesEvaluatedRef = useRef(onRoutesEvaluated);
   onRoutesEvaluatedRef.current = onRoutesEvaluated;
   const onSelectRouteIndexRef = useRef(onSelectRouteIndex);
   onSelectRouteIndexRef.current = onSelectRouteIndex;
+
+  // Auto-frame camera on selected origin/destination marker(s), or saved locations when idle
+  useEffect(() => {
+    if (!map) return;
+
+    if (resolvedOriginPos && resolvedDestPos) {
+      const pairKey = `pair:${resolvedOriginPos.lat.toFixed(4)},${resolvedOriginPos.lng.toFixed(4)}->${resolvedDestPos.lat.toFixed(4)},${resolvedDestPos.lng.toFixed(4)}`;
+      if (pairKey === lastFittedKeyRef.current) return;
+      lastFittedKeyRef.current = pairKey;
+
+      const samePoint =
+        Math.abs(resolvedOriginPos.lat - resolvedDestPos.lat) < 0.0002 &&
+        Math.abs(resolvedOriginPos.lng - resolvedDestPos.lng) < 0.0002;
+      if (samePoint) {
+        map.panTo(resolvedOriginPos);
+        map.setZoom(14);
+      } else {
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend(resolvedOriginPos);
+        bounds.extend(resolvedDestPos);
+        map.fitBounds(bounds, 64);
+      }
+      return;
+    }
+
+    const singlePoint = resolvedOriginPos ?? resolvedDestPos;
+    if (singlePoint) {
+      const singleKey = `single:${singlePoint.lat.toFixed(4)},${singlePoint.lng.toFixed(4)}`;
+      if (singleKey === lastFittedKeyRef.current) return;
+      lastFittedKeyRef.current = singleKey;
+
+      map.panTo(singlePoint);
+      map.setZoom(13);
+      return;
+    }
+
+    if (mappableStores.length === 0) return;
+
+    const fitKey = `stores:${mappableStores.map((s) => `${s.id ?? s.placeId}:${s.lat.toFixed(4)},${s.lng.toFixed(4)}`).join('|')}`;
+    if (fitKey === lastFittedKeyRef.current) return;
+    lastFittedKeyRef.current = fitKey;
+
+    if (mappableStores.length === 1) {
+      map.setCenter({ lat: mappableStores[0].lat, lng: mappableStores[0].lng });
+      map.setZoom(11);
+      return;
+    }
+
+    const bounds = new google.maps.LatLngBounds();
+    mappableStores.forEach((s) => bounds.extend({ lat: s.lat, lng: s.lng }));
+    map.fitBounds(bounds, 64);
+  }, [map, mappableStores, resolvedOriginPos, resolvedDestPos]);
 
   // Manage Google Maps Live Traffic Layer overlay
   useEffect(() => {
@@ -504,7 +564,7 @@ export function RouteMapPanel({
   stores,
   storesLoading,
   storesError,
-  onRefreshStores,
+  onManageLocations,
   origin,
   destination,
   homeStorePlaceId,
@@ -515,7 +575,13 @@ export function RouteMapPanel({
   onRouteComputed,
 }: RouteMapPanelProps) {
   const { t, formatLocalizedClock } = useI18n();
+  const geocodingLib = useMapsLibrary('geocoding');
   const [selectedStore, setSelectedStore] = useState<StoreLocation | null>(null);
+  const [activeStopPopup, setActiveStopPopup] = useState<'origin' | 'destination' | null>(null);
+  const [geocodedOriginPos, setGeocodedOriginPos] = useState<google.maps.LatLngLiteral | null>(
+    null
+  );
+  const [geocodedDestPos, setGeocodedDestPos] = useState<google.maps.LatLngLiteral | null>(null);
   const [routeOptions, setRouteOptions] = useState<TrafficRouteOption[]>([]);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [routesLoading, setRoutesLoading] = useState<boolean>(false);
@@ -618,17 +684,146 @@ export function RouteMapPanel({
     return formatLocalizedClock(trafficUpdatedAt.getTime());
   }, [trafficUpdatedAt, formatLocalizedClock]);
 
-  const showCustomOriginMarker =
-    origin &&
-    typeof origin.lat === 'number' &&
-    typeof origin.lng === 'number' &&
-    !stores.some((s) => s.placeId === origin.placeId);
+  const mappableStores = useMemo(
+    () => stores.filter((s) => s.hasCoordinates !== false),
+    [stores]
+  );
 
-  const showCustomDestMarker =
+  // Geocode origin when selected without explicit lat/lng (e.g. manual address or template)
+  useEffect(() => {
+    setActiveStopPopup((prev) => (prev === 'origin' ? null : prev));
+    if (!origin) {
+      setGeocodedOriginPos(null);
+      return;
+    }
+    if (typeof origin.lat === 'number' && typeof origin.lng === 'number') {
+      setGeocodedOriginPos(null);
+      return;
+    }
+    const matchedStore = mappableStores.find(
+      (s) =>
+        (origin.placeId && s.placeId === origin.placeId) ||
+        (origin.address && s.address.toLowerCase() === origin.address.toLowerCase())
+    );
+    if (matchedStore) {
+      setGeocodedOriginPos({ lat: matchedStore.lat, lng: matchedStore.lng });
+      return;
+    }
+    const queryText = (origin.address || origin.name).trim();
+    if (!geocodingLib || !queryText) {
+      setGeocodedOriginPos(null);
+      return;
+    }
+    let cancelled = false;
+    const geocoder = new geocodingLib.Geocoder();
+    geocoder
+      .geocode({ address: queryText })
+      .then((res) => {
+        if (cancelled) return;
+        const loc = res.results?.[0]?.geometry?.location;
+        if (loc) {
+          setGeocodedOriginPos({ lat: loc.lat(), lng: loc.lng() });
+        } else {
+          setGeocodedOriginPos(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setGeocodedOriginPos(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [origin?.placeId, origin?.address, origin?.name, origin?.lat, origin?.lng, mappableStores, geocodingLib]);
+
+  // Geocode destination when selected without explicit lat/lng (e.g. manual address or template)
+  useEffect(() => {
+    setActiveStopPopup((prev) => (prev === 'destination' ? null : prev));
+    if (!destination) {
+      setGeocodedDestPos(null);
+      return;
+    }
+    if (typeof destination.lat === 'number' && typeof destination.lng === 'number') {
+      setGeocodedDestPos(null);
+      return;
+    }
+    const matchedStore = mappableStores.find(
+      (s) =>
+        (destination.placeId && s.placeId === destination.placeId) ||
+        (destination.address && s.address.toLowerCase() === destination.address.toLowerCase())
+    );
+    if (matchedStore) {
+      setGeocodedDestPos({ lat: matchedStore.lat, lng: matchedStore.lng });
+      return;
+    }
+    const queryText = (destination.address || destination.name).trim();
+    if (!geocodingLib || !queryText) {
+      setGeocodedDestPos(null);
+      return;
+    }
+    let cancelled = false;
+    const geocoder = new geocodingLib.Geocoder();
+    geocoder
+      .geocode({ address: queryText })
+      .then((res) => {
+        if (cancelled) return;
+        const loc = res.results?.[0]?.geometry?.location;
+        if (loc) {
+          setGeocodedDestPos({ lat: loc.lat(), lng: loc.lng() });
+        } else {
+          setGeocodedDestPos(null);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setGeocodedDestPos(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    destination?.placeId,
+    destination?.address,
+    destination?.name,
+    destination?.lat,
+    destination?.lng,
+    mappableStores,
+    geocodingLib,
+  ]);
+
+  const resolvedOriginPos = useMemo<google.maps.LatLngLiteral | null>(() => {
+    if (!origin) return null;
+    if (typeof origin.lat === 'number' && typeof origin.lng === 'number') {
+      return { lat: origin.lat, lng: origin.lng };
+    }
+    if (geocodedOriginPos) return geocodedOriginPos;
+    const firstPt = activeRoute?.sampledPath?.[0];
+    return firstPt ? { lat: firstPt.lat, lng: firstPt.lng } : null;
+  }, [origin, geocodedOriginPos, activeRoute]);
+
+  const resolvedDestPos = useMemo<google.maps.LatLngLiteral | null>(() => {
+    if (!destination) return null;
+    if (typeof destination.lat === 'number' && typeof destination.lng === 'number') {
+      return { lat: destination.lat, lng: destination.lng };
+    }
+    if (geocodedDestPos) return geocodedDestPos;
+    const pts = activeRoute?.sampledPath;
+    const lastPt = pts && pts.length > 0 ? pts[pts.length - 1] : null;
+    return lastPt ? { lat: lastPt.lat, lng: lastPt.lng } : null;
+  }, [destination, geocodedDestPos, activeRoute]);
+
+  const originMatchesStore = Boolean(
+    origin &&
+      origin.placeId &&
+      mappableStores.some((s) => s.placeId === origin.placeId)
+  );
+
+  const destMatchesStore = Boolean(
     destination &&
-    typeof destination.lat === 'number' &&
-    typeof destination.lng === 'number' &&
-    !stores.some((s) => s.placeId === destination.placeId);
+      destination.placeId &&
+      mappableStores.some((s) => s.placeId === destination.placeId)
+  );
+
+  const showCustomOriginMarker = Boolean(origin && resolvedOriginPos && !originMatchesStore);
+  const showCustomDestMarker = Boolean(destination && resolvedDestPos && !destMatchesStore);
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -643,7 +838,9 @@ export function RouteMapPanel({
               ? t('routeMap.loadingStores')
               : storesError
                 ? storesError
-                : t('routeMap.storesSummary', { count: stores.length })}
+                : stores.length === 0
+                  ? t('routeMap.noLocationsSummary')
+                  : t('routeMap.storesSummary', { count: stores.length })}
           </p>
         </div>
 
@@ -681,15 +878,16 @@ export function RouteMapPanel({
             {t('routeMap.liveTraffic')}
           </button>
 
-          <button
-            type="button"
-            onClick={onRefreshStores}
-            disabled={storesLoading}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors whitespace-nowrap disabled:opacity-50"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${storesLoading ? 'animate-spin' : ''}`} />
-            {t('routeMap.stores')}
-          </button>
+          {onManageLocations && (
+            <button
+              type="button"
+              onClick={onManageLocations}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-md transition-colors whitespace-nowrap"
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              {t('routeMap.addLocation')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -700,12 +898,57 @@ export function RouteMapPanel({
         </div>
       )}
 
+      {/* Active Origin (A) & Destination (B) Marker Strip */}
+      {(origin || destination) && (
+        <div className="px-4 py-2 border-b border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs">
+          {origin && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedStore(null);
+                if (resolvedOriginPos) setActiveStopPopup('origin');
+              }}
+              className="inline-flex items-center gap-1.5 min-w-0 max-w-[260px] text-start hover:opacity-80 transition-opacity"
+            >
+              <span className="w-4 h-4 rounded-full bg-emerald-700 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                A
+              </span>
+              <span className="font-medium text-slate-800 dark:text-slate-200 truncate">
+                {origin.name}
+              </span>
+            </button>
+          )}
+          {origin && destination && (
+            <span aria-hidden="true" className="text-slate-400 dark:text-slate-600">
+              →
+            </span>
+          )}
+          {destination && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedStore(null);
+                if (resolvedDestPos) setActiveStopPopup('destination');
+              }}
+              className="inline-flex items-center gap-1.5 min-w-0 max-w-[260px] text-start hover:opacity-80 transition-opacity"
+            >
+              <span className="w-4 h-4 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                B
+              </span>
+              <span className="font-medium text-slate-800 dark:text-slate-200 truncate">
+                {destination.name}
+              </span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Interactive Google Map Canvas (explicit height to satisfy CF2) */}
       <div className="relative flex-1 min-h-[360px] w-full">
         <GoogleMap
           mapId="DEMO_MAP_ID"
-          defaultCenter={LA_DEFAULT_CENTER}
-          defaultZoom={10}
+          defaultCenter={DEFAULT_MAP_CENTER}
+          defaultZoom={4}
           gestureHandling="greedy"
           streetViewControl={false}
           mapTypeControl={false}
@@ -714,8 +957,11 @@ export function RouteMapPanel({
           className="w-full h-full"
         >
           <RouteOverlayController
+            mappableStores={mappableStores}
             origin={origin}
             destination={destination}
+            resolvedOriginPos={resolvedOriginPos}
+            resolvedDestPos={resolvedDestPos}
             gpsPoints={gpsPoints}
             showTrafficLayer={showTrafficLayer}
             avoidTolls={avoidTolls}
@@ -727,11 +973,11 @@ export function RouteMapPanel({
             onRoutesEvaluated={handleRoutesEvaluated}
           />
 
-          {/* Live-discovered Curacao LA Store Advanced Markers */}
-          {stores.map((store) => {
-            const isOrigin = origin?.placeId === store.placeId;
-            const isDest = destination?.placeId === store.placeId;
-            const isHome = homeStorePlaceId === store.placeId;
+          {/* User Saved Location Advanced Markers */}
+          {mappableStores.map((store) => {
+            const isOrigin = Boolean(origin?.placeId && origin.placeId === store.placeId);
+            const isDest = Boolean(destination?.placeId && destination.placeId === store.placeId);
+            const isHome = store.isHome || (homeStorePlaceId && homeStorePlaceId === store.placeId);
 
             const bg = isOrigin
               ? '#15803d'
@@ -746,28 +992,45 @@ export function RouteMapPanel({
                 ? '#92400e'
                 : '#1e3a8a';
 
+            const glyph = isOrigin
+              ? 'A'
+              : isDest
+                ? 'B'
+                : isHome
+                  ? 'H'
+                  : store.shortName.trim().charAt(0).toUpperCase() || '•';
+
             return (
               <AdvancedMarker
-                key={store.placeId}
+                key={store.id ?? store.placeId}
                 position={{ lat: store.lat, lng: store.lng }}
                 title={store.shortName}
-                onClick={() => setSelectedStore(store)}
+                zIndex={isOrigin || isDest ? 40 : 10}
+                onClick={() => {
+                  setActiveStopPopup(null);
+                  setSelectedStore(store);
+                }}
               >
                 <Pin
                   background={bg}
                   borderColor={border}
                   glyphColor="#ffffff"
-                  glyphText={isOrigin ? 'A' : isDest ? 'B' : 'C'}
+                  glyphText={glyph}
                 />
               </AdvancedMarker>
             );
           })}
 
-          {/* Custom non-Curacao Origin Pin */}
-          {showCustomOriginMarker && origin && (
+          {/* Selected Origin Pin (A) */}
+          {showCustomOriginMarker && origin && resolvedOriginPos && (
             <AdvancedMarker
-              position={{ lat: origin.lat!, lng: origin.lng! }}
-              title={origin.name}
+              position={resolvedOriginPos}
+              title={`Origin: ${origin.name}`}
+              zIndex={50}
+              onClick={() => {
+                setSelectedStore(null);
+                setActiveStopPopup('origin');
+              }}
             >
               <Pin
                 background="#15803d"
@@ -778,11 +1041,16 @@ export function RouteMapPanel({
             </AdvancedMarker>
           )}
 
-          {/* Custom non-Curacao Destination Pin */}
-          {showCustomDestMarker && destination && (
+          {/* Selected Destination Pin (B) */}
+          {showCustomDestMarker && destination && resolvedDestPos && (
             <AdvancedMarker
-              position={{ lat: destination.lat!, lng: destination.lng! }}
-              title={destination.name}
+              position={resolvedDestPos}
+              title={`Destination: ${destination.name}`}
+              zIndex={50}
+              onClick={() => {
+                setSelectedStore(null);
+                setActiveStopPopup('destination');
+              }}
             >
               <Pin
                 background="#d97706"
@@ -793,7 +1061,48 @@ export function RouteMapPanel({
             </AdvancedMarker>
           )}
 
-          {/* InfoWindow on clicked Curacao Store */}
+          {/* InfoWindow on clicked Origin (A) or Destination (B) marker */}
+          {activeStopPopup === 'origin' && origin && resolvedOriginPos && (
+            <InfoWindow
+              position={resolvedOriginPos}
+              onCloseClick={() => setActiveStopPopup(null)}
+            >
+              <div className="p-1 max-w-[240px] space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
+                  <span className="w-4 h-4 rounded-full bg-emerald-700 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                    A
+                  </span>
+                  <span>{t('loc.originLabel')}</span>
+                </div>
+                <div className="text-sm font-semibold text-slate-900">{origin.name}</div>
+                {origin.address && origin.address !== origin.name && (
+                  <p className="text-xs text-slate-600 leading-snug">{origin.address}</p>
+                )}
+              </div>
+            </InfoWindow>
+          )}
+
+          {activeStopPopup === 'destination' && destination && resolvedDestPos && (
+            <InfoWindow
+              position={resolvedDestPos}
+              onCloseClick={() => setActiveStopPopup(null)}
+            >
+              <div className="p-1 max-w-[240px] space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-800">
+                  <span className="w-4 h-4 rounded-full bg-amber-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                    B
+                  </span>
+                  <span>{t('loc.destinationLabel')}</span>
+                </div>
+                <div className="text-sm font-semibold text-slate-900">{destination.name}</div>
+                {destination.address && destination.address !== destination.name && (
+                  <p className="text-xs text-slate-600 leading-snug">{destination.address}</p>
+                )}
+              </div>
+            </InfoWindow>
+          )}
+
+          {/* InfoWindow on clicked Saved Location */}
           {selectedStore && (
             <InfoWindow
               position={{ lat: selectedStore.lat, lng: selectedStore.lng }}

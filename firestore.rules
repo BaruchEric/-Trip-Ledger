@@ -56,6 +56,36 @@ service cloud.firestore {
       return c is string && c in ['Parking', 'Tolls', 'Express Lane', 'Fuel / Gas', 'Supplies', 'Other'];
     }
 
+    function isValidLocationCategory(c) {
+      return c is string && c in ['Office', 'Client', 'Branch', 'Warehouse', 'Home', 'Other'];
+    }
+
+    function isValidLocation(data) {
+      return data.keys().hasAll([
+          'userId', 'name', 'address', 'placeId', 'category',
+          'lat', 'lng', 'hasCoordinates', 'isHome', 'notes',
+          'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'name', 'address', 'placeId', 'category',
+          'lat', 'lng', 'hasCoordinates', 'isHome', 'notes',
+          'createdAt', 'updatedAt'
+        ])
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.address is string && data.address.size() >= 1 && data.address.size() <= 240
+        && data.placeId is string && data.placeId.size() <= 160
+        && isValidLocationCategory(data.category)
+        && data.lat is number && data.lat >= -90 && data.lat <= 90
+        && data.lng is number && data.lng >= -180 && data.lng <= 180
+        && data.hasCoordinates is bool
+        && data.isHome is bool
+        && data.notes is string && data.notes.size() <= 200
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
     // --- Entity Validation Blueprints ---
     function isValidUserProfile(data) {
       return data.keys().hasAll([
@@ -388,6 +418,31 @@ service cloud.firestore {
         && isValidId(expenseId)
         && existing().userId == request.auth.uid
         && existing().status == 'ready';
+    }
+
+    // 6. User-Managed Saved Locations
+    match /locations/{locationId} {
+      allow get: if isVerifiedUser() && isValidId(locationId) && existing().userId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().userId == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(locationId)
+        && isValidLocation(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(locationId)
+        && isValidLocation(incoming())
+        && existing().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'address', 'placeId', 'category',
+          'lat', 'lng', 'hasCoordinates', 'isHome', 'notes', 'updatedAt'
+        ]);
+      allow delete: if isVerifiedUser()
+        && isValidId(locationId)
+        && existing().userId == request.auth.uid;
     }
   }
 }

@@ -34,9 +34,6 @@ const HISTORY_STOP_WORDS: Record<string, boolean> = {
   business: true,
   trip: true,
   store: true,
-  curacao: true,
-  los: true,
-  angeles: true,
   shift: true,
   run: true,
 };

@@ -20,6 +20,7 @@ import {
   Globe,
   LogIn,
   LogOut,
+  MapPin,
   Menu,
   Monitor,
   Moon,
@@ -29,6 +30,7 @@ import {
   X,
 } from 'lucide-react';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { LocationsView } from './components/LocationsView';
 import {
   ProfileSettingsView,
   type ProfileSettingsInput,
@@ -42,16 +44,18 @@ import {
   type NewTripInput,
 } from './components/TripLoggerView';
 import { useAutoDriveDetector } from './hooks/useAutoDriveDetector';
-import { useCuracaoStores } from './hooks/useCuracaoStores';
 import { useLiveGpsTracker } from './hooks/useLiveGpsTracker';
+import { useLocalLocations, useLocationHelpers } from './hooks/useSavedLocations';
 import { useTheme, type ThemePreference } from './hooks/useTheme';
 import {
   auth,
   db,
   handleFirestoreError,
   OperationType,
+  setAnalyticsUser,
   signInWithGoogle,
   signOutUser,
+  trackAnalyticsEvent,
 } from './lib/firebase';
 import {
   I18nProvider,
@@ -72,7 +76,10 @@ import {
   type MileageReport,
   type MileageTrip,
   type NewExpenseInput,
+  type PlaceSelection,
   type RouteTemplate,
+  type SavedLocation,
+  type SavedLocationInput,
   type TripExpense,
   type UserProfile,
 } from './types/mileage';
@@ -87,6 +94,7 @@ const NAV_ITEMS: Array<{
   icon: React.ComponentType<{ className?: string }>;
 }> = [
   { id: 'log', labelKey: 'nav.log', icon: Route },
+  { id: 'locations', labelKey: 'nav.locations', icon: MapPin },
   { id: 'ledger', labelKey: 'nav.ledger', icon: FileSpreadsheet },
   { id: 'reports', labelKey: 'nav.reports', icon: FileText },
   { id: 'settings', labelKey: 'nav.settings', icon: Settings },
@@ -120,21 +128,34 @@ function WorkspaceShell() {
   const [templates, setTemplates] = useState<RouteTemplate[]>([]);
   const [reports, setReports] = useState<MileageReport[]>([]);
   const [expenses, setExpenses] = useState<TripExpense[]>([]);
+  const [firestoreLocations, setFirestoreLocations] = useState<SavedLocation[]>([]);
+  const [locationsLoading, setLocationsLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
+
+  // Quick-pick handoff from LocationsView -> TripLoggerView
+  const [pendingPlacePick, setPendingPlacePick] = useState<{
+    role: 'origin' | 'destination';
+    place: PlaceSelection;
+    nonce: number;
+  } | null>(null);
 
   // Quick Expense modal state
   const [quickExpenseOpen, setQuickExpenseOpen] = useState(false);
   const [quickExpenseTripId, setQuickExpenseTripId] = useState<string>('');
 
-  // Google Maps Curacao LA store discovery + explicit GPS & Auto-Detect trackers
-  const { stores, loading: storesLoading, error: storesError, refreshStores, findNearestStore } =
-    useCuracaoStores();
+  // User-managed saved locations (Firestore when signed in, localStorage when guest)
+  const localLocations = useLocalLocations();
+  const activeLocations = user ? firestoreLocations : localLocations.locations;
+  const { storeLocations, findNearestStore, primaryBiasCenter } =
+    useLocationHelpers(activeLocations);
+
   const gpsTracker = useLiveGpsTracker();
   const autoDetector = useAutoDriveDetector();
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
+      setAnalyticsUser(firebaseUser?.uid ?? null);
       setAuthReady(true);
       if (!firebaseUser) {
         setProfile(null);
@@ -142,15 +163,22 @@ function WorkspaceShell() {
         setTemplates([]);
         setReports([]);
         setExpenses([]);
+        setFirestoreLocations([]);
+        setLocationsLoading(false);
       }
     });
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    trackAnalyticsEvent('page_view', { page_title: activeView });
+  }, [activeView]);
+
   // Real-time Firestore listeners (attached strictly after authReady && user)
   useEffect(() => {
     if (!authReady || !user) return;
     setDataLoading(true);
+    setLocationsLoading(true);
 
     const profileRef = doc(db, 'users', user.uid);
     const unsubProfile = onSnapshot(
@@ -218,12 +246,30 @@ function WorkspaceShell() {
       (err) => handleFirestoreError(err, OperationType.LIST, 'expenses')
     );
 
+    const locationsQuery = query(collection(db, 'locations'), where('userId', '==', user.uid));
+    const unsubLocations = onSnapshot(
+      locationsQuery,
+      (snap) => {
+        const list = snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<SavedLocation, 'id'>),
+        }));
+        setFirestoreLocations(list);
+        setLocationsLoading(false);
+      },
+      (err) => {
+        setLocationsLoading(false);
+        handleFirestoreError(err, OperationType.LIST, 'locations');
+      }
+    );
+
     return () => {
       unsubProfile();
       unsubTrips();
       unsubTemplates();
       unsubReports();
       unsubExpenses();
+      unsubLocations();
     };
   }, [authReady, user]);
 
@@ -231,6 +277,7 @@ function WorkspaceShell() {
     setAuthError(null);
     try {
       await signInWithGoogle();
+      trackAnalyticsEvent('login', { method: 'google' });
     } catch (err) {
       console.error('Google sign-in error:', err);
       setAuthError(t('auth.popupError'));
@@ -284,6 +331,10 @@ function WorkspaceShell() {
           reportId: '',
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
+        });
+        trackAnalyticsEvent('trip_logged', {
+          capture_method: input.captureMethod,
+          is_round_trip: Boolean(input.isRoundTrip),
         });
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, path);
@@ -425,6 +476,7 @@ function WorkspaceShell() {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
+        trackAnalyticsEvent('expense_logged', { category: input.category });
       } catch (err) {
         handleFirestoreError(err, OperationType.CREATE, path);
       }
@@ -443,6 +495,187 @@ function WorkspaceShell() {
       }
     },
     [user]
+  );
+
+  // --- Saved Locations CRUD (Firestore when signed in, localStorage when guest) ---
+  const handleAddLocation = useCallback(
+    async (input: SavedLocationInput) => {
+      if (!user) {
+        await localLocations.addLocation(input);
+        trackAnalyticsEvent('location_saved', {
+          category: input.category,
+          is_home: Boolean(input.isHome),
+        });
+        return;
+      }
+      const locId = generateDocId('loc');
+      const path = `locations/${locId}`;
+      const batch = writeBatch(db);
+      const cleanName = sanitizeStr(input.name, FIELD_LIMITS.locationName);
+      const cleanAddress = sanitizeStr(input.address, FIELD_LIMITS.locationAddress);
+      const cleanPlaceId = sanitizeStr(input.placeId, FIELD_LIMITS.placeId);
+      const isHome = Boolean(input.isHome);
+
+      if (isHome) {
+        for (const existingLoc of firestoreLocations) {
+          if (existingLoc.isHome) {
+            batch.update(doc(db, 'locations', existingLoc.id), {
+              isHome: false,
+              updatedAt: serverTimestamp(),
+            });
+          }
+        }
+        if (profile) {
+          batch.update(doc(db, 'users', user.uid), {
+            homeStoreName: sanitizeStr(cleanName, FIELD_LIMITS.homeStoreName),
+            homeStoreAddress: sanitizeStr(cleanAddress, FIELD_LIMITS.homeStoreAddress),
+            homeStorePlaceId: sanitizeStr(cleanPlaceId, FIELD_LIMITS.homeStorePlaceId),
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
+
+      batch.set(doc(db, 'locations', locId), {
+        userId: user.uid,
+        name: cleanName,
+        address: cleanAddress,
+        placeId: cleanPlaceId,
+        category: input.category,
+        lat: input.hasCoordinates ? Math.min(90, Math.max(-90, input.lat)) : 0,
+        lng: input.hasCoordinates ? Math.min(180, Math.max(-180, input.lng)) : 0,
+        hasCoordinates: Boolean(input.hasCoordinates),
+        isHome,
+        notes: sanitizeStr(input.notes, FIELD_LIMITS.locationNotes),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      try {
+        await batch.commit();
+        trackAnalyticsEvent('location_saved', {
+          category: input.category,
+          is_home: isHome,
+        });
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, path);
+      }
+    },
+    [user, localLocations, firestoreLocations, profile]
+  );
+
+  const handleUpdateLocation = useCallback(
+    async (locationId: string, input: SavedLocationInput) => {
+      if (!user) {
+        await localLocations.updateLocation(locationId, input);
+        return;
+      }
+      const path = `locations/${locationId}`;
+      const batch = writeBatch(db);
+      const cleanName = sanitizeStr(input.name, FIELD_LIMITS.locationName);
+      const cleanAddress = sanitizeStr(input.address, FIELD_LIMITS.locationAddress);
+      const cleanPlaceId = sanitizeStr(input.placeId, FIELD_LIMITS.placeId);
+      const isHome = Boolean(input.isHome);
+
+      if (isHome) {
+        for (const existingLoc of firestoreLocations) {
+          if (existingLoc.id !== locationId && existingLoc.isHome) {
+            batch.update(doc(db, 'locations', existingLoc.id), {
+              isHome: false,
+              updatedAt: serverTimestamp(),
+            });
+          }
+        }
+        if (profile) {
+          batch.update(doc(db, 'users', user.uid), {
+            homeStoreName: sanitizeStr(cleanName, FIELD_LIMITS.homeStoreName),
+            homeStoreAddress: sanitizeStr(cleanAddress, FIELD_LIMITS.homeStoreAddress),
+            homeStorePlaceId: sanitizeStr(cleanPlaceId, FIELD_LIMITS.homeStorePlaceId),
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
+
+      batch.update(doc(db, 'locations', locationId), {
+        name: cleanName,
+        address: cleanAddress,
+        placeId: cleanPlaceId,
+        category: input.category,
+        lat: input.hasCoordinates ? Math.min(90, Math.max(-90, input.lat)) : 0,
+        lng: input.hasCoordinates ? Math.min(180, Math.max(-180, input.lng)) : 0,
+        hasCoordinates: Boolean(input.hasCoordinates),
+        isHome,
+        notes: sanitizeStr(input.notes, FIELD_LIMITS.locationNotes),
+        updatedAt: serverTimestamp(),
+      });
+
+      try {
+        await batch.commit();
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, path);
+      }
+    },
+    [user, localLocations, firestoreLocations, profile]
+  );
+
+  const handleDeleteLocation = useCallback(
+    async (locationId: string) => {
+      if (!user) {
+        await localLocations.deleteLocation(locationId);
+        return;
+      }
+      const path = `locations/${locationId}`;
+      try {
+        await deleteDoc(doc(db, 'locations', locationId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, path);
+      }
+    },
+    [user, localLocations]
+  );
+
+  const handleSetHomeLocation = useCallback(
+    async (target: SavedLocation) => {
+      if (!user) {
+        await localLocations.setHomeLocation(target);
+        return;
+      }
+      const path = `locations/${target.id}`;
+      const batch = writeBatch(db);
+      for (const existingLoc of firestoreLocations) {
+        if (existingLoc.id !== target.id && existingLoc.isHome) {
+          batch.update(doc(db, 'locations', existingLoc.id), {
+            isHome: false,
+            updatedAt: serverTimestamp(),
+          });
+        }
+      }
+      batch.update(doc(db, 'locations', target.id), {
+        isHome: true,
+        updatedAt: serverTimestamp(),
+      });
+      if (profile) {
+        batch.update(doc(db, 'users', user.uid), {
+          homeStoreName: sanitizeStr(target.name, FIELD_LIMITS.homeStoreName),
+          homeStoreAddress: sanitizeStr(target.address, FIELD_LIMITS.homeStoreAddress),
+          homeStorePlaceId: sanitizeStr(target.placeId, FIELD_LIMITS.homeStorePlaceId),
+          updatedAt: serverTimestamp(),
+        });
+      }
+      try {
+        await batch.commit();
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, path);
+      }
+    },
+    [user, localLocations, firestoreLocations, profile]
+  );
+
+  const handleUseLocationInTrip = useCallback(
+    (role: 'origin' | 'destination', place: PlaceSelection) => {
+      setPendingPlacePick({ role, place, nonce: Date.now() });
+      setActiveView('log');
+    },
+    []
   );
 
   const handleOpenQuickExpense = useCallback(
@@ -548,7 +781,7 @@ function WorkspaceShell() {
           FIELD_LIMITS.employeeName
         ),
         employeeId: sanitizeStr(profile?.employeeId || '', FIELD_LIMITS.employeeId),
-        department: sanitizeStr(profile?.department || 'Retail Operations', FIELD_LIMITS.department),
+        department: sanitizeStr(profile?.department || '', FIELD_LIMITS.department),
         homeStoreName: sanitizeStr(profile?.homeStoreName || '', FIELD_LIMITS.homeStoreName),
         vehicleInfo: sanitizeStr(profile?.vehicleInfo || '', FIELD_LIMITS.vehicleInfo),
         tripCount: targetTrips.length,
@@ -577,6 +810,7 @@ function WorkspaceShell() {
 
       try {
         await batch.commit();
+        trackAnalyticsEvent('report_generated', { trip_count: targetTrips.length });
         setSelectedReportId(reportId);
         setActiveView('reports');
       } catch (err) {
@@ -739,6 +973,11 @@ function WorkspaceShell() {
                       {autoDetector.detectedDrives.length}
                     </span>
                   )}
+                {item.id === 'locations' && activeLocations.length > 0 && (
+                  <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400 font-semibold">
+                    {activeLocations.length}
+                  </span>
+                )}
                 {item.id === 'ledger' && readyTrips.length > 0 && (
                   <span className="text-xs font-mono tabular-nums text-amber-700 dark:text-amber-400 font-semibold">
                     {readyTrips.length}
@@ -1107,10 +1346,11 @@ function WorkspaceShell() {
               isAuthenticated={Boolean(user)}
               onRequestSignIn={() => void handleSignIn()}
               profile={profile}
-              stores={stores}
-              storesLoading={storesLoading}
-              storesError={storesError}
-              onRefreshStores={refreshStores}
+              stores={storeLocations}
+              storesLoading={locationsLoading}
+              biasCenter={primaryBiasCenter}
+              onManageLocations={() => setActiveView('locations')}
+              pendingPlacePick={pendingPlacePick}
               findNearestStore={findNearestStore}
               templates={templates}
               trips={trips}
@@ -1126,13 +1366,30 @@ function WorkspaceShell() {
             />
           )}
 
+          {activeView === 'locations' && (
+            <LocationsView
+              isAuthenticated={Boolean(user)}
+              onRequestSignIn={() => void handleSignIn()}
+              locations={activeLocations}
+              loading={locationsLoading}
+              biasCenter={primaryBiasCenter}
+              onAddLocation={handleAddLocation}
+              onUpdateLocation={handleUpdateLocation}
+              onDeleteLocation={handleDeleteLocation}
+              onSetHomeLocation={handleSetHomeLocation}
+              onUseLocationInTrip={handleUseLocationInTrip}
+            />
+          )}
+
           {activeView === 'ledger' && (
             <TripLedgerView
               profile={profile}
               trips={trips}
               expenses={expenses}
               reports={reports}
-              stores={stores}
+              stores={storeLocations}
+              biasCenter={primaryBiasCenter}
+              onManageLocations={() => setActiveView('locations')}
               templates={templates}
               findNearestStore={findNearestStore}
               loading={dataLoading}
@@ -1175,8 +1432,10 @@ function WorkspaceShell() {
               onRequestSignIn={() => void handleSignIn()}
               userDisplayName={user?.displayName ?? ''}
               profile={profile}
-              stores={stores}
-              storesLoading={storesLoading}
+              stores={storeLocations}
+              biasCenter={primaryBiasCenter}
+              findNearestStore={findNearestStore}
+              onManageLocations={() => setActiveView('locations')}
               onSaveProfile={handleSaveProfile}
             />
           )}
@@ -1226,7 +1485,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <I18nProvider>
-        <APIProvider apiKey={MAPS_API_KEY} language="en" region="US">
+        <APIProvider apiKey={MAPS_API_KEY}>
           <WorkspaceShell />
         </APIProvider>
       </I18nProvider>

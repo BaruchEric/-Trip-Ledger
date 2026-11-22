@@ -120,6 +120,8 @@ interface TripLedgerViewProps {
   expenses: TripExpense[];
   reports: MileageReport[];
   stores: StoreLocation[];
+  biasCenter?: google.maps.LatLngLiteral | null;
+  onManageLocations?: () => void;
   templates: RouteTemplate[];
   findNearestStore: (
     lat: number,
@@ -146,6 +148,8 @@ export function TripLedgerView({
   expenses,
   reports,
   stores,
+  biasCenter,
+  onManageLocations,
   templates,
   findNearestStore,
   loading,
@@ -226,7 +230,11 @@ export function TripLedgerView({
   }, [expenses]);
 
   const filteredTrips = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const tokens = searchQuery
+      .trim()
+      .toLowerCase()
+      .split(/\s+/)
+      .filter(Boolean);
     return trips
       .filter((t) => {
         if (statusFilter === 'all') return true;
@@ -235,25 +243,29 @@ export function TripLedgerView({
       .filter((t) => (purposeFilter === 'all' ? true : t.purpose === purposeFilter))
       .filter((t) => (!dateFilter ? true : t.tripDate === dateFilter))
       .filter((trip) => {
-        if (!q) return true;
+        if (tokens.length === 0) return true;
         const formattedDate = formatLocalizedDate(trip.tripDate).toLowerCase();
         const reportRef = (reportById[trip.reportId]?.reportNumber ?? '').toLowerCase();
         const stage = getTripStage(trip, reportById);
         const localizedPurpose = tPurpose(trip.purpose).toLowerCase();
         const localizedStage = tStage(stage).toLowerCase();
-        return (
-          trip.destinationName.toLowerCase().includes(q) ||
-          trip.destinationAddress.toLowerCase().includes(q) ||
-          trip.originName.toLowerCase().includes(q) ||
-          trip.purpose.toLowerCase().includes(q) ||
-          localizedPurpose.includes(q) ||
-          trip.notes.toLowerCase().includes(q) ||
-          trip.tripDate.includes(q) ||
-          formattedDate.includes(q) ||
-          reportRef.includes(q) ||
-          stage.includes(q) ||
-          localizedStage.includes(q)
-        );
+        const searchableText = [
+          trip.originName,
+          trip.originAddress,
+          trip.destinationName,
+          trip.destinationAddress,
+          trip.purpose,
+          localizedPurpose,
+          trip.notes,
+          trip.tripDate,
+          formattedDate,
+          reportRef,
+          stage,
+          localizedStage,
+        ]
+          .join(' ')
+          .toLowerCase();
+        return tokens.every((token) => searchableText.includes(token));
       })
       .sort((a, b) => {
         const tieBreak = () => {
@@ -758,17 +770,25 @@ export function TripLedgerView({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={t('ledger.searchPlaceholder')}
-                className="w-full ps-9 pe-8 py-2 text-xs sm:text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
+                className="w-full ps-9 pe-20 py-2 text-xs sm:text-sm bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-600/20 focus:border-blue-600"
               />
               {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  aria-label={t('common.close')}
-                  className="absolute end-2.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
+                <div className="absolute end-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
+                  <span
+                    className="text-[11px] font-mono tabular-nums text-slate-500 dark:text-slate-400"
+                    dir="ltr"
+                  >
+                    {filteredTrips.length}/{trips.length}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    aria-label={t('common.clear')}
+                    className="p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               )}
             </div>
 
@@ -1287,6 +1307,8 @@ export function TripLedgerView({
         initialTrip={driveModalState.initialTrip}
         profile={profile}
         stores={stores}
+        biasCenter={biasCenter}
+        onManageLocations={onManageLocations}
         templates={templates}
         findNearestStore={findNearestStore}
         onClose={() =>

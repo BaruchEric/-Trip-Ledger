@@ -1,5 +1,12 @@
 import { initializeApp } from 'firebase/app';
 import {
+  getAnalytics,
+  isSupported as isAnalyticsSupported,
+  logEvent as firebaseLogEvent,
+  setUserId as firebaseSetUserId,
+  type Analytics,
+} from 'firebase/analytics';
+import {
   getAuth,
   GoogleAuthProvider,
   signInWithPopup,
@@ -20,6 +27,53 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+// Lazily & safely initialize Firebase Analytics only when measurementId is configured
+const measurementId = (firebaseConfig.measurementId ?? '').trim();
+let analyticsPromise: Promise<Analytics | null> | null = null;
+
+function getAnalyticsInstance(): Promise<Analytics | null> {
+  if (!measurementId) {
+    return Promise.resolve(null);
+  }
+  if (!analyticsPromise) {
+    analyticsPromise = isAnalyticsSupported()
+      .then((supported) => (supported ? getAnalytics(app) : null))
+      .catch(() => null);
+  }
+  return analyticsPromise;
+}
+
+if (measurementId) {
+  void getAnalyticsInstance();
+}
+
+export function setAnalyticsUser(uid: string | null): void {
+  if (!measurementId) return;
+  void getAnalyticsInstance().then((analytics) => {
+    if (!analytics) return;
+    try {
+      firebaseSetUserId(analytics, uid);
+    } catch {
+      // Ignore analytics errors in restricted browser environments
+    }
+  });
+}
+
+export function trackAnalyticsEvent(
+  eventName: string,
+  params?: Record<string, string | number | boolean>
+): void {
+  if (!measurementId) return;
+  void getAnalyticsInstance().then((analytics) => {
+    if (!analytics) return;
+    try {
+      firebaseLogEvent(analytics, eventName, params);
+    } catch {
+      // Ignore analytics errors in restricted browser environments
+    }
+  });
+}
 
 export enum OperationType {
   CREATE = 'create',
