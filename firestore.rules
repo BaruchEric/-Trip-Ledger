@@ -1,0 +1,393 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Pillar 0: Default-deny global safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(uid) {
+      return isVerifiedUser() && request.auth.uid == uid;
+    }
+
+    function isValidDateStr(s) {
+      return s is string && s.size() == 10 && s.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function isValidPurpose(p) {
+      return p is string && p in [
+        'Inter-Store Transfer',
+        'Shift Coverage',
+        'Bank Deposit',
+        'Supply Run',
+        'Customer Delivery',
+        'Training / HQ',
+        'Other'
+      ];
+    }
+
+    function isValidCaptureMethod(m) {
+      return m is string && m in ['route_auto', 'gps_live', 'template', 'manual'];
+    }
+
+    function isValidExpenseCategory(c) {
+      return c is string && c in ['Parking', 'Tolls', 'Express Lane', 'Fuel / Gas', 'Supplies', 'Other'];
+    }
+
+    // --- Entity Validation Blueprints ---
+    function isValidUserProfile(data) {
+      return data.keys().hasAll([
+          'uid', 'employeeName', 'employeeId', 'department', 'managerEmail',
+          'homeStoreName', 'homeStoreAddress', 'homeStorePlaceId', 'vehicleInfo',
+          'ratePerMile', 'normalCommuteMiles', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'uid', 'employeeName', 'employeeId', 'department', 'managerEmail',
+          'homeStoreName', 'homeStoreAddress', 'homeStorePlaceId', 'vehicleInfo',
+          'ratePerMile', 'normalCommuteMiles', 'createdAt', 'updatedAt'
+        ])
+        && data.uid == request.auth.uid
+        && isValidId(data.uid)
+        && data.employeeName is string && data.employeeName.size() <= 100
+        && data.employeeId is string && data.employeeId.size() <= 40
+        && data.department is string && data.department.size() <= 80
+        && data.managerEmail is string && data.managerEmail.size() <= 120
+        && data.homeStoreName is string && data.homeStoreName.size() <= 120
+        && data.homeStoreAddress is string && data.homeStoreAddress.size() <= 240
+        && data.homeStorePlaceId is string && data.homeStorePlaceId.size() <= 160
+        && data.vehicleInfo is string && data.vehicleInfo.size() <= 100
+        && data.ratePerMile is number && data.ratePerMile >= 0.01 && data.ratePerMile <= 5
+        && data.normalCommuteMiles is number && data.normalCommuteMiles >= 0 && data.normalCommuteMiles <= 200
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTrip(data) {
+      return data.keys().hasAll([
+          'userId', 'tripDate', 'originName', 'originAddress', 'originPlaceId',
+          'destinationName', 'destinationAddress', 'destinationPlaceId', 'purpose',
+          'notes', 'oneWayMiles', 'commuteDeductionMiles', 'billableMiles',
+          'durationMinutes', 'isRoundTrip', 'captureMethod', 'ratePerMile',
+          'reimbursementAmount', 'status', 'reportId', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'tripDate', 'originName', 'originAddress', 'originPlaceId',
+          'destinationName', 'destinationAddress', 'destinationPlaceId', 'purpose',
+          'notes', 'oneWayMiles', 'commuteDeductionMiles', 'billableMiles',
+          'durationMinutes', 'isRoundTrip', 'captureMethod', 'ratePerMile',
+          'reimbursementAmount', 'status', 'reportId', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && isValidDateStr(data.tripDate)
+        && data.originName is string && data.originName.size() >= 1 && data.originName.size() <= 120
+        && data.originAddress is string && data.originAddress.size() <= 240
+        && data.originPlaceId is string && data.originPlaceId.size() <= 160
+        && data.destinationName is string && data.destinationName.size() >= 1 && data.destinationName.size() <= 120
+        && data.destinationAddress is string && data.destinationAddress.size() <= 240
+        && data.destinationPlaceId is string && data.destinationPlaceId.size() <= 160
+        && isValidPurpose(data.purpose)
+        && data.notes is string && data.notes.size() <= 300
+        && data.oneWayMiles is number && data.oneWayMiles >= 0 && data.oneWayMiles <= 2000
+        && data.commuteDeductionMiles is number && data.commuteDeductionMiles >= 0 && data.commuteDeductionMiles <= 200
+        && data.billableMiles is number && data.billableMiles >= 0 && data.billableMiles <= 4000
+        && data.durationMinutes is number && data.durationMinutes >= 0 && data.durationMinutes <= 1440
+        && data.isRoundTrip is bool
+        && isValidCaptureMethod(data.captureMethod)
+        && data.ratePerMile is number && data.ratePerMile >= 0.01 && data.ratePerMile <= 5
+        && data.reimbursementAmount is number && data.reimbursementAmount >= 0 && data.reimbursementAmount <= 20000
+        && data.status is string && data.status in ['ready', 'submitted']
+        && data.reportId is string && data.reportId.size() <= 128
+        && ((data.status == 'ready' && data.reportId == '') || (data.status == 'submitted' && isValidId(data.reportId)))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidTemplate(data) {
+      return data.keys().hasAll([
+          'userId', 'label', 'originName', 'originAddress', 'originPlaceId',
+          'destinationName', 'destinationAddress', 'destinationPlaceId', 'purpose',
+          'oneWayMiles', 'durationMinutes', 'isRoundTrip', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'label', 'originName', 'originAddress', 'originPlaceId',
+          'destinationName', 'destinationAddress', 'destinationPlaceId', 'purpose',
+          'oneWayMiles', 'durationMinutes', 'isRoundTrip', 'createdAt'
+        ])
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.label is string && data.label.size() >= 1 && data.label.size() <= 100
+        && data.originName is string && data.originName.size() >= 1 && data.originName.size() <= 120
+        && data.originAddress is string && data.originAddress.size() <= 240
+        && data.originPlaceId is string && data.originPlaceId.size() <= 160
+        && data.destinationName is string && data.destinationName.size() >= 1 && data.destinationName.size() <= 120
+        && data.destinationAddress is string && data.destinationAddress.size() <= 240
+        && data.destinationPlaceId is string && data.destinationPlaceId.size() <= 160
+        && isValidPurpose(data.purpose)
+        && data.oneWayMiles is number && data.oneWayMiles >= 0 && data.oneWayMiles <= 2000
+        && data.durationMinutes is number && data.durationMinutes >= 0 && data.durationMinutes <= 1440
+        && data.isRoundTrip is bool
+        && data.createdAt is timestamp;
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll([
+          'userId', 'reportNumber', 'periodStart', 'periodEnd', 'employeeName',
+          'employeeId', 'department', 'homeStoreName', 'vehicleInfo', 'tripCount',
+          'totalMiles', 'totalReimbursement', 'status', 'submittedAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'reportNumber', 'periodStart', 'periodEnd', 'employeeName',
+          'employeeId', 'department', 'homeStoreName', 'vehicleInfo', 'tripCount',
+          'totalMiles', 'totalReimbursement', 'status', 'submittedAt', 'updatedAt'
+        ])
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.reportNumber is string && data.reportNumber.size() >= 1 && data.reportNumber.size() <= 40
+        && isValidDateStr(data.periodStart)
+        && isValidDateStr(data.periodEnd)
+        && data.employeeName is string && data.employeeName.size() <= 100
+        && data.employeeId is string && data.employeeId.size() <= 40
+        && data.department is string && data.department.size() <= 80
+        && data.homeStoreName is string && data.homeStoreName.size() <= 120
+        && data.vehicleInfo is string && data.vehicleInfo.size() <= 100
+        && data.tripCount is number && data.tripCount >= 1 && data.tripCount <= 500
+        && data.totalMiles is number && data.totalMiles >= 0 && data.totalMiles <= 50000
+        && data.totalReimbursement is number && data.totalReimbursement >= 0 && data.totalReimbursement <= 250000
+        && data.status is string && data.status in ['submitted', 'reimbursed']
+        && data.submittedAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidExpense(data) {
+      return data.keys().hasAll([
+          'userId', 'tripId', 'reportId', 'expenseDate', 'category',
+          'description', 'amount', 'notes', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'tripId', 'reportId', 'expenseDate', 'category',
+          'description', 'amount', 'notes', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.userId == request.auth.uid
+        && isValidId(data.userId)
+        && data.tripId is string && data.tripId.size() <= 128
+        && (data.tripId == '' || isValidId(data.tripId))
+        && data.reportId is string && data.reportId.size() <= 128
+        && isValidDateStr(data.expenseDate)
+        && isValidExpenseCategory(data.category)
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 160
+        && data.amount is number && data.amount >= 0.01 && data.amount <= 5000
+        && data.notes is string && data.notes.size() <= 300
+        && data.status is string && data.status in ['ready', 'submitted']
+        && ((data.status == 'ready' && data.reportId == '') || (data.status == 'submitted' && isValidId(data.reportId)))
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // --- Collection Rules ---
+
+    // 1. Private Employee Profiles (PII strictly owner-only, no list)
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+      allow list: if false;
+      allow create: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isOwner(userId)
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'employeeName', 'employeeId', 'department', 'managerEmail',
+          'homeStoreName', 'homeStoreAddress', 'homeStorePlaceId', 'vehicleInfo',
+          'ratePerMile', 'normalCommuteMiles', 'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    // 2. Business Mileage Trips
+    match /trips/{tripId} {
+      allow get: if isVerifiedUser() && isValidId(tripId) && existing().userId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().userId == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(tripId)
+        && isValidTrip(incoming())
+        && incoming().status == 'ready'
+        && incoming().reportId == ''
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(tripId)
+        && isValidTrip(incoming())
+        && existing().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && existing().status == 'ready'
+        && (
+          // Action 1: Edit unsubmitted trip details
+          (
+            incoming().status == 'ready'
+            && incoming().reportId == ''
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'tripDate', 'originName', 'originAddress', 'originPlaceId',
+              'destinationName', 'destinationAddress', 'destinationPlaceId',
+              'purpose', 'notes', 'oneWayMiles', 'commuteDeductionMiles',
+              'billableMiles', 'durationMinutes', 'isRoundTrip',
+              'ratePerMile', 'reimbursementAmount', 'updatedAt'
+            ])
+          )
+          ||
+          // Action 2: Atomically attach trip to a new or open submitted report
+          (
+            incoming().status == 'submitted'
+            && isValidId(incoming().reportId)
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reportId', 'updatedAt'])
+            && existsAfter(/databases/$(database)/documents/reports/$(incoming().reportId))
+            && getAfter(/databases/$(database)/documents/reports/$(incoming().reportId)).data.userId == request.auth.uid
+            && getAfter(/databases/$(database)/documents/reports/$(incoming().reportId)).data.status == 'submitted'
+          )
+        );
+      allow delete: if isVerifiedUser()
+        && isValidId(tripId)
+        && existing().userId == request.auth.uid
+        && existing().status == 'ready';
+    }
+
+    // 3. Saved Recurring Route Templates
+    match /templates/{templateId} {
+      allow get: if isVerifiedUser() && isValidId(templateId) && existing().userId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().userId == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(templateId)
+        && isValidTemplate(incoming())
+        && incoming().createdAt == request.time;
+      allow update: if false;
+      allow delete: if isVerifiedUser()
+        && isValidId(templateId)
+        && existing().userId == request.auth.uid;
+    }
+
+    // 4. Finalized Mileage Reports
+    match /reports/{reportId} {
+      allow get: if isVerifiedUser() && isValidId(reportId) && existing().userId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().userId == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(reportId)
+        && isValidReport(incoming())
+        && incoming().status == 'submitted'
+        && incoming().submittedAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(reportId)
+        && isValidReport(incoming())
+        && existing().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().submittedAt == existing().submittedAt
+        && incoming().updatedAt == request.time
+        && existing().status == 'submitted'
+        && (
+          // Action 1: Mark submitted report as reimbursed (terminal state)
+          (
+            incoming().status == 'reimbursed'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          )
+          ||
+          // Action 2: Append batch-assigned ready trips to an open submitted report
+          (
+            incoming().status == 'submitted'
+            && incoming().tripCount > existing().tripCount
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'periodStart', 'periodEnd', 'tripCount', 'totalMiles', 'totalReimbursement', 'updatedAt'
+            ])
+          )
+        );
+      allow delete: if false;
+    }
+
+    // 5. Non-Mileage Business Expenses (Parking, Tolls, Supplies)
+    match /expenses/{expenseId} {
+      allow get: if isVerifiedUser() && isValidId(expenseId) && existing().userId == request.auth.uid;
+      allow list: if isVerifiedUser() && existing().userId == request.auth.uid;
+      allow create: if isVerifiedUser()
+        && isValidId(expenseId)
+        && isValidExpense(incoming())
+        && incoming().status == 'ready'
+        && incoming().reportId == ''
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          incoming().tripId == ''
+          || (
+            exists(/databases/$(database)/documents/trips/$(incoming().tripId))
+            && get(/databases/$(database)/documents/trips/$(incoming().tripId)).data.userId == request.auth.uid
+          )
+        );
+      allow update: if isVerifiedUser()
+        && isValidId(expenseId)
+        && isValidExpense(incoming())
+        && existing().userId == request.auth.uid
+        && incoming().userId == existing().userId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && existing().status == 'ready'
+        && (
+          // Action 1: Edit unsubmitted expense details
+          (
+            incoming().status == 'ready'
+            && incoming().reportId == ''
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'tripId', 'expenseDate', 'category', 'description', 'amount', 'notes', 'updatedAt'
+            ])
+            && (
+              incoming().tripId == ''
+              || (
+                exists(/databases/$(database)/documents/trips/$(incoming().tripId))
+                && get(/databases/$(database)/documents/trips/$(incoming().tripId)).data.userId == request.auth.uid
+              )
+            )
+          )
+          ||
+          // Action 2: Atomically attach expense to a new or open submitted report
+          (
+            incoming().status == 'submitted'
+            && isValidId(incoming().reportId)
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'reportId', 'updatedAt'])
+            && existsAfter(/databases/$(database)/documents/reports/$(incoming().reportId))
+            && getAfter(/databases/$(database)/documents/reports/$(incoming().reportId)).data.userId == request.auth.uid
+            && getAfter(/databases/$(database)/documents/reports/$(incoming().reportId)).data.status == 'submitted'
+          )
+        );
+      allow delete: if isVerifiedUser()
+        && isValidId(expenseId)
+        && existing().userId == request.auth.uid
+        && existing().status == 'ready';
+    }
+  }
+}

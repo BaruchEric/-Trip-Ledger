@@ -1,0 +1,6 @@
+{
+  "name": "Curacao Mileage",
+  "description": "Automated business mileage tracker and reimbursement report builder for Curacao retail employees in Los Angeles.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
