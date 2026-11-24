@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 import {
   getAnalytics,
   isSupported as isAnalyticsSupported,
@@ -23,6 +24,13 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+const siteKey = firebaseConfig.recaptchaSiteKey?.trim();
+if (typeof window !== 'undefined' && siteKey) {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(siteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
